@@ -3,6 +3,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from rejoice.audio import get_audio_input_devices
 from rejoice.core.config import get_config_dir, load_config
 
 console = Console()
@@ -49,7 +50,7 @@ def show():
         console.print(f"\n📁 Config directory: {config_dir}")
         console.print(f"📄 Config file: {config_dir / 'config.yaml'}")
 
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - defensive, surfaced via click
         console.print(f"[red]Error loading config: {e}[/red]")
         raise click.Abort()
 
@@ -110,3 +111,44 @@ ai:
     config_file.write_text(default_config)
     console.print(f"[green]✓ Configuration file created: {config_file}[/green]")
     console.print("[dim]Edit this file to customize your settings[/dim]")
+
+
+@config_group.command("list-mics")
+def list_mics() -> None:
+    """List available audio input devices.
+
+    This command helps users discover which microphones Rejoice can use.
+    It corresponds to the backlog story [R-001] Audio Device Detection.
+    """
+
+    try:
+        devices = get_audio_input_devices()
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise click.Abort()
+
+    if not devices:
+        console.print("[yellow]No audio input devices found.[/yellow]")
+        console.print(
+            "[dim]Check your system audio settings and ensure a microphone is "
+            "connected.[/dim]"
+        )
+        return
+
+    table = Table(title="Audio Input Devices", show_header=True, header_style="bold")
+    table.add_column("Index", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Default", style="magenta")
+
+    for dev in devices:
+        index = dev.get("index")
+        name = dev.get("name", f"Device {index}")
+        is_default = dev.get("is_default", False)
+        default_label = "✓" if is_default else ""
+        table.add_row(str(index), name, default_label)
+
+    console.print(table)
+    console.print(
+        "\nUse the device index or name in your config.yaml under the "
+        "'audio.device' setting."
+    )

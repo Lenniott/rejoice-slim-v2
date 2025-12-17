@@ -166,6 +166,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - User installation script: `scripts/install.sh` ([I-001] ✅ Complete)
    - Uninstall script: `scripts/uninstall.sh` ([I-003] ✅ Complete)
 
+### Added - Phase 2: Core Recording System
+
+- [R-001] Audio Device Detection
+  - Implemented `get_audio_input_devices` helper in `rejoice.audio` to enumerate input-capable devices
+  - Added `rec config list-mics` CLI command to list microphones with index and default marker
+  - Tests: 3 new unit tests covering device filtering and CLI behavior (all passing)
+
 ### Known Issues / Limitations
 
 - Coverage is at ~48% (expected for Phase 0, will increase as features are added)
