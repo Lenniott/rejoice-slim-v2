@@ -1,8 +1,15 @@
 """Pytest configuration and shared fixtures."""
-import pytest
+import sys
 from pathlib import Path
-import tempfile
-import shutil
+
+# Add src directory to Python path for imports
+src_path = Path(__file__).parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+import pytest  # noqa: E402
+import tempfile  # noqa: E402
+import shutil  # noqa: E402
 
 
 @pytest.fixture
@@ -27,4 +34,3 @@ def config_dir(tmp_dir):
     config_dir = tmp_dir / ".rejoice" / "config"
     config_dir.mkdir(parents=True)
     return config_dir
-

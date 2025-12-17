@@ -48,7 +48,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest tests/unit -v --cov=src/rejoice --cov-report=xml --cov-report=term-missing
+          pytest tests/unit -v --cov=src/rejoice --cov-report=xml --cov-report=term-missing --cov-fail-under=90
 
       - name: Run integration tests
         run: |
@@ -63,4 +63,3 @@ jobs:
       - name: Check coverage threshold
         run: |
           pytest --cov=src/rejoice --cov-report=term --cov-fail-under=90 || echo "Coverage below 90% - this will be enforced in later phases"
-
