@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `fixtures/` - Test data (empty, ready)
   - `docs/` - Documentation
   - `scripts/` - Installation and utility scripts
+    - `install.sh` - One-command installation script for macOS and Linux ([I-001])
+      - Detects OS (macOS/Linux) and installs system dependencies (portaudio, ffmpeg)
+      - Creates isolated virtual environment at `~/.rejoice/venv`
+      - Installs Rejoice package (from source or PyPI)
+      - Sets up shell alias (`rec` command) for bash, zsh, and fish
+      - Tests installation and provides next steps
+      - Supports both development (from source) and production (from PyPI) installations
   - `.github/workflows/` - CI/CD configuration
 
 #### Dependencies Installed
@@ -98,6 +105,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests for all exception classes
   - Tests for error messages and suggestions
 - `tests/unit/test_main.py` - Main module tests (2 tests):
+- `tests/integration/test_install_script.py` - Installation script tests (4 tests):
+  - `test_install_script_syntax()` - Validates bash syntax
+  - `test_install_script_exists()` - Verifies script exists
+  - `test_install_script_is_executable()` - Verifies executable permissions
+  - `test_install_script_has_shebang()` - Verifies shebang line
   - Tests module import
   - Tests main function existence
 
@@ -215,13 +227,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 8. **Installation:**
    - Development: `pip install -e ".[dev]"`
-   - User installation script not yet created ([I-001])
+   - User installation script: `scripts/install.sh` ([I-001] ✅ Complete)
 
 ### Known Issues / Limitations
 
 - Coverage is at ~48% (expected for Phase 0, will increase as features are added)
-- User installation script not yet implemented
-- Uninstall script not yet implemented
+- Uninstall script not yet implemented ([I-003])
 - Most modules are empty (ready for implementation)
 
 ### Technical Decisions
@@ -238,7 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Next Release Planning
 
 ### Phase 0 Remaining (High Priority)
-- [I-001] Installation Script
+- [I-001] Installation Script ✅ Complete
 - [I-003] Uninstall Script
 
 ### Phase 1: Foundation (Next)

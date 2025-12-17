@@ -9,9 +9,9 @@
 ## 📊 Progress Overview
 
 - **Total Stories:** 91
-- **Completed:** 6
+- **Completed:** 7
 - **In Progress:** 0
-- **Not Started:** 85
+- **Not Started:** 84
 
 ---
 
@@ -96,20 +96,20 @@ As a [user type], I want [goal] so that [benefit].
 ### [I-001] Installation Script
 **Priority:** Critical
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** None
 
 **User Story:**
 As a user, I want one-command installation so that setup is effortless.
 
 **Acceptance Criteria:**
-- [ ] `curl | bash` installer works
-- [ ] Creates virtual environment
-- [ ] Installs dependencies
-- [ ] Sets up config directory
-- [ ] Creates `rec` command alias
-- [ ] Tests installation
-- [ ] Works on macOS and Linux
+- [x] `curl | bash` installer works
+- [x] Creates virtual environment
+- [x] Installs dependencies
+- [x] Sets up config directory
+- [x] Creates `rec` command alias
+- [x] Tests installation
+- [x] Works on macOS and Linux
 
 **Technical Notes:**
 ```bash
