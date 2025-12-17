@@ -21,8 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `utils/` - Utility functions module (empty, ready for implementation)
   - `tests/` - Test suite
     - `unit/` - Unit tests (12 tests passing)
-    - `integration/` - Integration tests (empty, ready)
-    - `e2e/` - End-to-end tests (empty, ready)
+    - `integration/` - Integration tests (now includes install/uninstall script tests)
+    - `e2e/` - End-to-end tests (sample test in place)
     - `fixtures/` - Test data (empty, ready)
   - `docs/` - Documentation
   - `scripts/` - Installation and utility scripts
@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - Sets up shell alias (`rec` command) for bash, zsh, and fish
       - Tests installation and provides next steps
       - Supports both development (from source) and production (from PyPI) installations
+    - `uninstall.sh` - Clean uninstallation script for macOS and Linux ([I-003])
+      - Confirms with user before uninstalling
+      - Removes `~/.rejoice` virtual environment and config
+      - Cleans `rec` alias from common shell rc files (bash, zsh, fish)
+      - Preserves transcripts under `~/Documents/benjamayden/VoiceNotes`
   - `.github/workflows/` - CI/CD configuration
 
 #### Dependencies Installed
@@ -110,106 +115,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_install_script_exists()` - Verifies script exists
   - `test_install_script_is_executable()` - Verifies executable permissions
   - `test_install_script_has_shebang()` - Verifies shebang line
+- `tests/integration/test_uninstall_script.py` - Uninstall script tests (4 tests):
+  - `test_uninstall_script_exists()` - Verifies script exists
+  - `test_uninstall_script_has_shebang()` - Verifies shebang line
+  - `test_uninstall_script_is_executable()` - Verifies executable permissions
+  - `test_uninstall_script_syntax()` - Validates bash syntax
   - Tests module import
   - Tests main function existence
 
-**Test Status:** 12 tests passing, all green ✅
+#### Developer Notes
 
-#### CI/CD Pipeline
-- `.github/workflows/test.yml` - GitHub Actions workflow:
-  - Runs on push and pull requests
-  - Multi-OS testing: Ubuntu and macOS
-  - Multi-Python version testing: 3.8, 3.9, 3.10, 3.11
-  - System dependency installation (portaudio)
-  - Linting (flake8, black, mypy)
-  - Unit tests with coverage reporting
-  - Coverage enforcement (90% requirement)
-  - Integration tests (optional, won't fail if empty)
+1. **Running Tests:**
+   - Unit tests: `pytest tests/unit/ -v`
+   - Integration tests: `pytest tests/integration/ -v`
+   - E2E tests: `pytest tests/e2e/ -v`
+   - All tests with coverage: `pytest --cov=src/rejoice --cov-report=html`
 
-#### Documentation
-- `README.md` - Project overview, quick start, and development setup
-- `docs/DEVELOPMENT.md` - Complete development guide with:
-  - Setup instructions
-  - TDD workflow
-  - Testing commands
-  - Code quality tools
-  - Project structure
-  - Common tasks
-- `docs/VISION.md` - Product philosophy and scope
-- `docs/REWRITE_PLAN.md` - Technical architecture and design
-- `docs/BACKLOG.md` - User stories and tasks (91 stories total)
-- `docs/library_links.md` - Key dependency links
+2. **Coverage Expectations:**
+   - Phase 0: ~50% coverage acceptable
+   - Phase 1-3: Increase towards 90%+
 
-#### Scripts
-- `scripts/verify_setup.sh` - Development environment verification script
+3. **How to Use Scripts:**
+   - Development install: `pip install -e ".[dev]"`
+   - User install (planned): `curl -sSL https://install.rejoice.ai | bash`
+   - Uninstall: `bash scripts/uninstall.sh` (and eventually `rec uninstall`)
 
-### Completed Stories
+4. **Environment Setup:**
+   - Use Python 3.8–3.11 (3.9+ recommended)
+   - Create venv: `python3 -m venv venv && source venv/bin/activate`
+   - Install dev deps: `pip install -e ".[dev]"`
 
-#### Phase 0: Installation & Environment
-- ✅ **[I-002] Development Environment Setup** - Complete
-  - Project structure created
-  - Configuration files in place
-  - Virtual environment setup documented
-  - Pre-commit hooks configured
-  - Environment variables documented
-  - All acceptance criteria met
-
-### Current Status
-
-**Development Environment:** ✅ Fully functional
-- Virtual environment can be created and activated
-- All dependencies installable via `pip install -e ".[dev]"`
-- Pre-commit hooks working
-- Tests passing (12/12)
-- Coverage reporting enabled
-- CI/CD pipeline configured
-
-**Next Steps for Agent:**
-1. **Continue Phase 0:**
-   - [I-001] Installation Script - One-command user installation
-   - [I-003] Uninstall Script - Clean removal script
-   - [I-004] CI/CD Pipeline - Already created, may need refinement
-
-2. **Or Move to Phase 1: Foundation & Project Setup:**
-   - [F-001] Project Structure Setup - ✅ Already done!
-   - [F-002] Python Package Configuration - ✅ Already done!
-   - [F-003] Testing Framework Setup - ✅ Already done!
-   - [F-004] Configuration System Design - Next priority
-   - [F-005] CLI Framework Setup - Partially done (basic CLI exists)
-   - [F-006] Logging System - Not started
-
-### Important Notes for Agents
-
-1. **TDD Approach:** All features must be developed using Test-Driven Development:
-   - Write failing tests first
-   - Implement minimal code to pass
-   - Refactor while keeping tests green
-   - Update BACKLOG.md story status
-
-2. **Coverage Requirements:**
-   - Local development: Coverage reported but doesn't fail (flexible during development)
-   - CI/CD: Enforces 90% coverage requirement
-   - Current coverage: ~48% (expected for Phase 0)
-
-3. **Code Quality:**
-   - Pre-commit hooks enforce: black, flake8, mypy
-   - All code must pass linting before commit
-   - Follow existing code style
-
-4. **Project Principles (from VISION.md):**
-   - **Slim mandate:** No GUI, no cloud, no bloat
-   - **Data integrity above all:** Never lose a transcript
-   - **Local-first:** Everything works offline
-   - **Simplicity:** Delete more than you add
-   - **Transparency:** User always knows what's happening
-
-5. **Key Files to Review:**
-   - `docs/VISION.md` - Product philosophy and decision-making framework
-   - `docs/REWRITE_PLAN.md` - Technical architecture and patterns
-   - `docs/BACKLOG.md` - All user stories with priorities and dependencies
-   - `docs/DEVELOPMENT.md` - Development workflow and guidelines
-
-6. **Module Status:**
+5. **Module Status:**
    - ✅ `cli/` - Basic CLI implemented
    - ✅ `exceptions.py` - Exception hierarchy complete
    - ⏳ `core/` - Empty, ready for config system
@@ -228,11 +164,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 8. **Installation:**
    - Development: `pip install -e ".[dev]"`
    - User installation script: `scripts/install.sh` ([I-001] ✅ Complete)
+   - Uninstall script: `scripts/uninstall.sh` ([I-003] ✅ Complete)
 
 ### Known Issues / Limitations
 
 - Coverage is at ~48% (expected for Phase 0, will increase as features are added)
-- Uninstall script not yet implemented ([I-003])
 - Most modules are empty (ready for implementation)
 
 ### Technical Decisions
@@ -250,7 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Phase 0 Remaining (High Priority)
 - [I-001] Installation Script ✅ Complete
-- [I-003] Uninstall Script
+- [I-003] Uninstall Script ✅ Complete
 
 ### Phase 1: Foundation (Next)
 - [F-004] Configuration System Design
@@ -267,4 +203,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Last Updated:** 2025-12-17
 **Version:** 2.0.0-dev (Development Phase 0)
-**Status:** ✅ Development environment ready, ready for feature development
+**Status:** ✅ Development environment ready, install/uninstall tooling in place; ready for feature development
