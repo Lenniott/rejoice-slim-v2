@@ -1,0 +1,13 @@
+# Production dependencies for Rejoice Slim v2
+# Generated from pyproject.toml
+# Install with: pip install -r requirements.txt
+
+faster-whisper>=0.10.0
+sounddevice>=0.4.6
+ollama>=0.1.0
+pyperclip>=1.8.2
+pyyaml>=6.0
+rich>=13.0.0
+atomicwrites>=1.4.0
+click>=8.0.0
+python-dotenv>=1.0.0

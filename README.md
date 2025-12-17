@@ -2,7 +2,7 @@
 
 **Local-first voice transcription tool - terminal-only, privacy-first**
 
-Rejoice = {record, jot, voice}  
+Rejoice = {record, jot, voice}
 Slim = {super lightweight, no UI, no cloud, no crazy}
 
 ## Purpose
@@ -44,7 +44,11 @@ rec
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (choose one method):
+# Method 1: Using requirements files
+pip install -r requirements-dev.txt
+
+# Method 2: Using pyproject.toml (recommended)
 pip install -e ".[dev]"
 
 # Install pre-commit hooks
@@ -82,4 +86,3 @@ rejoice-v2/
 ## License
 
 MIT License
-

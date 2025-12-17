@@ -30,6 +30,7 @@ dependencies = [
     "rich>=13.0.0",
     "atomicwrites>=1.4.0",
     "click>=8.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
