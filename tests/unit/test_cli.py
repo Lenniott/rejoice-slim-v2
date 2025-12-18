@@ -5,11 +5,7 @@ from typing import List, Tuple
 import click
 from click.testing import CliRunner
 
-from rejoice.cli.commands import (
-    main,
-    start_recording_session,
-    _default_wait_for_stop,
-)
+from rejoice.cli.commands import main, start_recording_session, _default_wait_for_stop
 
 
 def test_cli_help():
@@ -298,3 +294,85 @@ def test_start_recording_handles_ctrl_c_and_marks_cancelled(monkeypatch, tmp_pat
 
     # Status is updated to cancelled, not completed
     assert ("update_status", transcript_path, "cancelled") in events
+
+
+def test_list_recordings_shows_message_when_no_transcripts(monkeypatch, tmp_path):
+    """GIVEN no transcript files in the save directory
+    WHEN `rec list` is invoked
+    THEN a friendly 'no recordings' message is shown and the command exits successfully.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    # Point the CLI at an empty temporary directory for transcripts
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["list"])
+
+    assert result.exit_code == 0
+    assert "No recordings found" in result.output
+
+
+def test_list_recordings_shows_transcripts_sorted_newest_first(monkeypatch, tmp_path):
+    """GIVEN multiple transcript files in the save directory
+    WHEN `rec list` is invoked
+    THEN transcripts are listed newest-first with ID, date and filename columns.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    # Create a few transcript files that match the manager naming pattern
+    first = save_dir / "transcript_20250101_000001.md"
+    second = save_dir / "transcript_20250102_000002.md"
+    third = save_dir / "transcript_20250103_000003.md"
+
+    for path in (first, second, third):
+        path.write_text("dummy content", encoding="utf-8")
+
+    # Point config at our temporary transcripts directory
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["list"])
+
+    assert result.exit_code == 0
+
+    # Expect table-like output; newest (2025-01-03) should appear first.
+    output_lines = [
+        line for line in result.output.splitlines() if "transcript_2025" in line
+    ]
+
+    assert len(output_lines) == 3
+
+    # Check ordering: IDs and dates should be in descending date order
+    assert "000003" in output_lines[0]
+    assert "2025-01-03" in output_lines[0]
+    assert "000002" in output_lines[1]
+    assert "2025-01-02" in output_lines[1]
+    assert "000001" in output_lines[2]
+    assert "2025-01-01" in output_lines[2]

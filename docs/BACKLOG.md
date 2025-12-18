@@ -31,9 +31,9 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 - Core recording & transcripts:
   - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ✅ [R-008]
 - Core transcription:
-  - ✅ [T-001], ❌ [T-002], ✅ [T-003]
+  - ✅ [T-001], ✅ [T-002], ✅ [T-003]
 - Core user commands:
-  - ❌ [C-001], ❌ [C-003]
+  - ✅ [C-001], ❌ [C-003]
 
 **MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
 
@@ -1814,7 +1814,7 @@ for file in files:
 ### [C-001] List Recordings Command
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-003]
 
 **User Story:**

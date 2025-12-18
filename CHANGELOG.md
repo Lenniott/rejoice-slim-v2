@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `stream_file_to_transcript` to persist the effective language into transcript YAML frontmatter via a new atomic `update_language` helper in the transcript manager.
   - Added a global `--language / -l` CLI flag to accept per-invocation language overrides (plumbed into Click context for future transcription commands) and expanded unit coverage around language handling.
 
+- [C-001] List Recordings Command
+  - Implemented `rec list` CLI subcommand to list transcript files from the configured output directory using the standard naming pattern.
+  - Output displays ID, date and filename in a Rich table, sorted newest-first, with a simple limit parameter and a friendly message when no recordings exist.
+  - Added two unit tests covering empty and populated transcript directories, with the full test suite passing at 93% coverage.
+
 ## [2.0.0] - 2025-12-17
 
 ### Added - Phase 0: Development Environment Setup

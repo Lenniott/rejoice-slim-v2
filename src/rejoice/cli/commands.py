@@ -7,13 +7,18 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.prompt import Confirm
+from rich.table import Table
 
 from rejoice import __version__
 from rejoice.audio import record_audio
 from rejoice.cli.config_commands import config_group
 from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
-from rejoice.transcript.manager import create_transcript, update_status
+from rejoice.transcript.manager import (
+    TRANSCRIPT_FILENAME_PATTERN,
+    create_transcript,
+    update_status,
+)
 
 console = Console()
 
@@ -136,6 +141,29 @@ def start_recording_session(
     return filepath, transcript_id
 
 
+def _iter_transcripts(save_dir: Path):
+    """Yield transcript files in the given directory matching the standard pattern."""
+    if not save_dir.exists():
+        return []
+
+    files = []
+    for entry in save_dir.iterdir():
+        if not entry.is_file():
+            continue
+        if TRANSCRIPT_FILENAME_PATTERN.match(entry.name):
+            files.append(entry)
+
+    # Sort by date (derived from filename) and ID, newest first.
+    def sort_key(path: Path):
+        match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
+        assert match is not None  # Covered by construction above
+        date_str, id_str = match.groups()
+        return (date_str, id_str)
+
+    files.sort(key=sort_key, reverse=True)
+    return files
+
+
 @click.group(invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Show version and exit")
 @click.option("--debug", is_flag=True, help="Enable debug mode")
@@ -170,6 +198,36 @@ def main(ctx, version, debug, language):
     # If no subcommand, start a recording session
     if ctx.invoked_subcommand is None:
         start_recording_session()
+
+
+@main.command("list")
+def list_recordings(limit: int = 50):
+    """List recorded transcripts implementing [C-001] List Recordings Command."""
+    config = load_config()
+    save_dir = Path(config.output.save_path).expanduser()
+
+    transcripts = _iter_transcripts(save_dir)
+    if not transcripts:
+        console.print("No recordings found in your transcripts directory.")
+        return
+
+    # Apply simple limit/pagination
+    transcripts = transcripts[:limit]
+
+    table = Table(title="Your Recordings")
+    table.add_column("ID")
+    table.add_column("Date")
+    table.add_column("Filename")
+
+    for path in transcripts:
+        match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
+        if not match:
+            continue
+        date_str, id_str = match.groups()
+        formatted_date = f"{date_str[0:4]}-{date_str[4:6]}-{date_str[6:8]}"
+        table.add_row(id_str, formatted_date, path.name)
+
+    console.print(table)
 
 
 # Add config subcommand group
