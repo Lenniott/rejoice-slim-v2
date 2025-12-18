@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [R-005] ID Normalization System
+  - Introduced a `normalize_id` helper in `transcript/manager.py` to convert flexible numeric input like `"1"`, `"01"` or `"000001"` into the canonical zero-padded 6-digit transcript ID.
+  - Added unit tests covering valid formats, non-numeric inputs, and out-of-range values (zero, negative and too-large IDs), keeping transcript ID handling predictable and safe for future CLI commands.
+
 - [R-008] Recording Control - Cancel
   - Extended `start_recording_session` in `cli/commands.py` to treat `Ctrl+C` as an explicit cancel flow with confirmation.
   - Implemented optional transcript deletion or safe cancellation by marking frontmatter status as `cancelled`, always cleaning up the audio stream.

@@ -672,7 +672,7 @@ def append_to_transcript(filepath: Path, text: str):
 ### [R-005] ID Normalization System
 **Priority:** High
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-003]
 
 **User Story:**

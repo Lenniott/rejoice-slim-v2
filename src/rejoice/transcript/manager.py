@@ -34,6 +34,46 @@ class TranscriptMetadata:
     language: str = "auto"
 
 
+def normalize_id(user_input: str) -> str:
+    """Normalise a user-supplied transcript ID to the standard 6‑digit format.
+
+    Accepts flexible numeric input such as ``"1"``, ``"01"`` or ``"000001"``
+    and returns a zero-padded string of width :data:`ID_WIDTH`.
+
+    Raises:
+        TranscriptError: If the input is non-numeric or outside the valid range.
+    """
+    raw = user_input.strip()
+
+    # Allow an optional leading sign for clearer error messages on negatives,
+    # but otherwise require a clean numeric string.
+    numeric_str = raw
+    if raw.startswith(("+", "-")):
+        numeric_str = raw[1:]
+
+    if not numeric_str.isdigit():
+        display = raw or user_input
+        raise TranscriptError(
+            f"'{display}' is not a valid transcript ID.",
+            suggestion="Use a numeric ID such as '1' or '000001'.",
+        )
+
+    numeric = int(raw)
+
+    min_id = 1
+    max_id = 10**ID_WIDTH - 1
+    if numeric < min_id or numeric > max_id:
+        raise TranscriptError(
+            f"Transcript ID {numeric} is out of range.",
+            suggestion=(
+                f"Use an ID between {min_id} and {max_id}, "
+                "for example '1' or '000001'."
+            ),
+        )
+
+    return str(numeric).zfill(ID_WIDTH)
+
+
 def get_next_id(save_dir: Path) -> str:
     """Get the next available 6-digit transcript ID.
 

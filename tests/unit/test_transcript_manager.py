@@ -4,8 +4,10 @@ from pathlib import Path
 import re
 import tempfile
 
+import pytest
+
 from rejoice.transcript import manager
-from rejoice.transcript.manager import TranscriptMetadata
+from rejoice.transcript.manager import ID_WIDTH, TranscriptMetadata
 
 
 def read_file(path: Path) -> str:
@@ -336,3 +338,48 @@ def test_generate_frontmatter_allows_custom_language():
 
     frontmatter = manager.generate_frontmatter(meta)
     assert "language: en" in frontmatter
+
+
+def test_normalize_id_accepts_various_numeric_formats():
+    """GIVEN several numeric ID representations
+    WHEN normalize_id is called
+    THEN they are all normalised to a zero-padded width.
+    """
+    # Single- and multi-digit forms should all map to the same padded ID
+    assert manager.normalize_id("1") == "1".zfill(ID_WIDTH)
+    assert manager.normalize_id("01") == "1".zfill(ID_WIDTH)
+    assert manager.normalize_id("001") == "1".zfill(ID_WIDTH)
+    assert manager.normalize_id("000001") == "1".zfill(ID_WIDTH)
+
+    # Whitespace should be ignored
+    assert manager.normalize_id("  42  ") == "42".zfill(ID_WIDTH)
+
+
+def test_normalize_id_rejects_non_numeric_input():
+    """GIVEN non-numeric input
+    WHEN normalize_id is called
+    THEN a TranscriptError is raised with a helpful message.
+    """
+    for value in ["abc", "12x", "", " ", "1-2", "00_001"]:
+        try:
+            manager.normalize_id(value)
+        except manager.TranscriptError as exc:
+            assert str(value.strip() or value) in exc.message
+            assert "valid transcript ID" in exc.message
+        else:  # pragma: no cover - defensive; the test will fail via assert
+            assert False, f"Expected TranscriptError for input {value!r}"
+
+
+def test_normalize_id_rejects_out_of_range_values():
+    """GIVEN zero, negative or too-large numeric IDs
+    WHEN normalize_id is called
+    THEN a TranscriptError is raised to prevent invalid IDs.
+    """
+    too_large = str(10**ID_WIDTH)
+
+    for value in ["0", "-1", too_large]:
+        with pytest.raises(manager.TranscriptError) as exc_info:
+            manager.normalize_id(value)
+
+        message = str(exc_info.value)
+        assert "out of range" in message
