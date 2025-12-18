@@ -207,4 +207,3 @@ pytest --cov=src/rejoice --cov-report=html
 - Start with Phase 0: Installation & Environment
 - Write tests first (TDD)
 - Keep it simple (Slim mandate)
-

@@ -1,7 +1,7 @@
 # 🎯 Rejoice Slim - Vision Document
 
-**Version:** 2.0  
-**Date:** December 17, 2025  
+**Version:** 2.0
+**Date:** December 17, 2025
 **Status:** Active Guide for Development
 
 ---

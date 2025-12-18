@@ -54,4 +54,3 @@ echo "Next steps:"
 echo "  1. Review docs/BACKLOG.md for next stories"
 echo "  2. Start with Phase 0 stories"
 echo "  3. Follow TDD: write tests first!"
-

@@ -1,5 +1,4 @@
 """Tests for CLI commands."""
-import pytest
 from click.testing import CliRunner
 from rejoice.cli.commands import main
 
@@ -33,4 +32,3 @@ def test_cli_debug_flag():
     result = runner.invoke(main, ["--debug"])
     assert result.exit_code == 0
     assert "Debug mode enabled" in result.output or "debug" in result.output.lower()
-

@@ -1,7 +1,7 @@
 # 🎙️ Rejoice v2 - Project Specification
 
-**Status:** New Project - Planning Phase  
-**Date:** December 17, 2025  
+**Status:** New Project - Planning Phase
+**Date:** December 17, 2025
 **Approach:** Greenfield rewrite (clean slate, no legacy code)
 
 > **Note:** This is a complete rewrite starting from scratch. We're not migrating or refactoring existing code - we're building a new system based on lessons learned. The old `rejoice-slim` project taught us what works and what doesn't, and this specification describes the ideal system we want to build.
@@ -14,7 +14,7 @@
 
 **Key Philosophy:**
 - Data integrity over features
-- Simplicity over cleverness  
+- Simplicity over cleverness
 - Transparency over magic
 - Privacy by design
 - Test-driven development
@@ -244,67 +244,67 @@ from rejoice.transcript_manager import TranscriptManager
 
 class TestTranscriptManager:
     """Test transcript creation and management"""
-    
+
     @pytest.fixture
     def manager(self, tmp_path):
         """Create transcript manager with temp directory"""
         return TranscriptManager(save_dir=tmp_path)
-    
+
     def test_create_transcript_creates_file_with_frontmatter(self, manager):
         """GIVEN a transcript manager
         WHEN creating a new transcript
         THEN file exists with valid frontmatter"""
-        
+
         # Arrange
         content = "Test transcription content"
-        
+
         # Act
         file_path, transcript_id = manager.create_transcript(content)
-        
+
         # Assert
         assert file_path.exists()
         assert transcript_id.isdigit()
-        
+
         content = file_path.read_text()
         assert "---" in content
         assert f"id: '{transcript_id}'" in content
         assert "status: recording" in content
         assert "Test transcription content" in content
-    
+
     def test_append_to_transcript_preserves_existing_content(self, manager):
         """GIVEN an existing transcript
         WHEN appending new text
         THEN original content is preserved"""
-        
+
         # Arrange
         file_path, _ = manager.create_transcript("Initial content")
-        
+
         # Act
         manager.append_to_transcript(file_path, "Appended content")
-        
+
         # Assert
         content = file_path.read_text()
         assert "Initial content" in content
         assert "Appended content" in content
-    
+
     def test_append_to_transcript_is_atomic(self, manager, monkeypatch):
         """GIVEN an append operation
         WHEN write fails mid-operation
         THEN original file is unchanged"""
-        
+
         # Arrange
         file_path, _ = manager.create_transcript("Original")
         original_content = file_path.read_text()
-        
+
         # Simulate write failure
         def mock_write_fail(*args, **kwargs):
             raise IOError("Disk full")
-        
+
         # Act
         with pytest.raises(IOError):
             monkeypatch.setattr(Path, "write_text", mock_write_fail)
             manager.append_to_transcript(file_path, "Should fail")
-        
+
         # Assert - original file unchanged
         assert file_path.read_text() == original_content
 ```
@@ -535,14 +535,14 @@ whisper:
   engine: faster  # 'faster' or 'whisperx'
   vad_enabled: true
   vad_threshold: 0.5
-  
+
 # Features
 features:
   speaker_diarization: false  # Default for -speakers
   timestamps: false           # Default for -timestamp
   auto_copy: true
   auto_cleanup_audio: true
-  
+
 # AI Enhancement (Ollama)
 ollama:
   enabled: true
@@ -565,7 +565,7 @@ template:
     - summary
     - last_processed
     - archive_by
-  
+
   defaults:
     type: voice-note
     status: recording
@@ -579,11 +579,11 @@ prompts:
   title: |
     Based on this transcript, generate a brief 3-5 word title.
     Transcript: {transcript}
-  
+
   summary: |
     Summarize the following transcript in 2-3 sentences.
     Transcript: {transcript}
-  
+
   tags: |
     Generate 3-5 relevant tags for this transcript.
     Return as JSON array.
@@ -599,7 +599,7 @@ cli:
 audio:
   sample_rate: 16000
   device: -1  # -1 for default, or device ID
-  
+
 # Debug
 debug:
   enabled: false
@@ -678,14 +678,14 @@ class FrontmatterField:
 
 class TranscriptTemplate:
     """Configurable transcript template"""
-    
+
     def __init__(self, config: Dict[str, Any]):
         self.fields = self._load_fields(config)
-    
+
     def _load_fields(self, config: Dict[str, Any]) -> List[FrontmatterField]:
         """Load field definitions from config"""
         fields = []
-        
+
         # Standard fields
         fields.append(FrontmatterField(
             name="id",
@@ -694,7 +694,7 @@ class TranscriptTemplate:
             auto_generate=True,
             generator=self._generate_id
         ))
-        
+
         fields.append(FrontmatterField(
             name="created",
             type=datetime,
@@ -702,14 +702,14 @@ class TranscriptTemplate:
             auto_generate=True,
             generator=lambda: datetime.now().strftime('%Y-%m-%d %H:%M')
         ))
-        
+
         fields.append(FrontmatterField(
             name="status",
             type=str,
             default="recording",
             required=True
         ))
-        
+
         # User-defined fields from config
         for field_name in config.get('template', {}).get('frontmatter', []):
             if field_name not in ['id', 'created', 'status']:
@@ -719,13 +719,13 @@ class TranscriptTemplate:
                     type=type(default),
                     default=default
                 ))
-        
+
         return fields
-    
+
     def create_frontmatter(self, overrides: Dict[str, Any] = None) -> str:
         """Generate frontmatter YAML"""
         overrides = overrides or {}
-        
+
         data = {}
         for field in self.fields:
             if field.name in overrides:
@@ -734,9 +734,9 @@ class TranscriptTemplate:
                 data[field.name] = field.generator()
             else:
                 data[field.name] = field.default
-        
+
         return self._to_yaml(data)
-    
+
     def _to_yaml(self, data: Dict[str, Any]) -> str:
         """Convert data to YAML frontmatter"""
         import yaml
@@ -891,10 +891,10 @@ summary: Panel interview with 3 interviewers discussing candidate qualifications
 ```
 1. Initial creation (before AI enhancement):
    42_17122025_streaming_transcript.md
-   
+
 2. After AI generates title "Team Standup Meeting":
    42_17122025_team-standup-meeting.md
-   
+
 3. Manual rename allowed (preserves ID and date):
    42_17122025_custom-name-here.md
 ```
@@ -924,30 +924,30 @@ summary: Panel interview with 3 interviewers discussing candidate qualifications
 def generate_slug(title: str, max_length: int = 50) -> str:
     """
     Generate URL-safe slug from title.
-    
+
     Examples:
         "Team Standup Meeting" → "team-standup-meeting"
         "Q4 2025 Review & Planning!" → "q4-2025-review-planning"
         "Alice & Bob's Discussion" → "alice-bobs-discussion"
     """
     import re
-    
+
     # Lowercase
     slug = title.lower()
-    
+
     # Replace non-alphanumeric with hyphens
     slug = re.sub(r'[^a-z0-9]+', '-', slug)
-    
+
     # Remove leading/trailing hyphens
     slug = slug.strip('-')
-    
+
     # Collapse multiple hyphens
     slug = re.sub(r'-+', '-', slug)
-    
+
     # Truncate to max length at word boundary
     if len(slug) > max_length:
         slug = slug[:max_length].rsplit('-', 1)[0]
-    
+
     return slug
 ```
 
@@ -968,9 +968,9 @@ If AI title generation fails or returns empty:
 ```
 1. Created during recording:
    stream_1734441600.wav
-   
+
 2. Used for transcription
-   
+
 3. Deleted after successful transcription (if AUTO_CLEANUP=true)
    OR kept for debugging (if AUTO_CLEANUP=false)
 ```
@@ -1029,7 +1029,7 @@ If AI title generation fails or returns empty:
 def get_unique_filename(base_path: Path) -> Path:
     """
     Ensure unique filename by appending counter if needed.
-    
+
     Example:
         42_17122025_meeting-notes.md      # Original
         42_17122025_meeting-notes-2.md    # Collision
@@ -1037,16 +1037,16 @@ def get_unique_filename(base_path: Path) -> Path:
     """
     if not base_path.exists():
         return base_path
-    
+
     counter = 2
     while True:
         stem = base_path.stem
         new_name = f"{stem}-{counter}{base_path.suffix}"
         new_path = base_path.parent / new_name
-        
+
         if not new_path.exists():
             return new_path
-        
+
         counter += 1
 ```
 
@@ -1061,14 +1061,14 @@ def get_unique_filename(base_path: Path) -> Path:
 def validate_transcript_filename(filename: str) -> bool:
     """
     Validate transcript filename format.
-    
+
     Valid: 42_17122025_meeting-notes.md
     Invalid: meeting-notes.md
     Invalid: 42_meeting.md
     Invalid: 42_17122025.md
     """
     import re
-    
+
     pattern = r'^(\d+)_(\d{8})_([a-z0-9-]+)\.md$'
     return bool(re.match(pattern, filename))
 ```
@@ -1081,18 +1081,18 @@ def validate_transcript_filename(filename: str) -> bool:
 def get_next_id(voice_notes_dir: Path) -> str:
     """
     Get next available transcript ID.
-    
+
     Scans existing files, finds highest ID, returns ID+1.
     """
     existing_files = voice_notes_dir.glob("*.md")
-    
+
     max_id = 0
     for file in existing_files:
         match = re.match(r'^(\d+)_', file.name)
         if match:
             file_id = int(match.group(1))
             max_id = max(max_id, file_id)
-    
+
     return str(max_id + 1)
 ```
 
@@ -1159,24 +1159,24 @@ from typing import Iterator, Dict, Any
 
 class Transcriber:
     """Unified transcription interface"""
-    
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.model_name = config['whisper']['model']
         self.device = "cpu"  # or "cuda" if available
         self.compute_type = "int8"
-        
+
         # Load appropriate model based on features
         self.needs_whisperx = (
             config['features']['speaker_diarization'] or
             config['features']['timestamps']
         )
-        
+
         if self.needs_whisperx:
             self._load_whisperx()
         else:
             self._load_faster_whisper()
-    
+
     def _load_faster_whisper(self):
         """Load faster-whisper for basic transcription"""
         self.model = WhisperModel(
@@ -1185,7 +1185,7 @@ class Transcriber:
             compute_type=self.compute_type
         )
         self.engine = "faster-whisper"
-    
+
     def _load_whisperx(self):
         """Load WhisperX for advanced features"""
         self.model = whisperx.load_model(
@@ -1193,26 +1193,26 @@ class Transcriber:
             device=self.device,
             compute_type=self.compute_type
         )
-        
+
         # Load alignment model for word-level timestamps
         self.align_model, self.align_metadata = whisperx.load_align_model(
             language_code=self.config['language'],
             device=self.device
         )
-        
+
         # Load diarization model if needed
         if self.config['features']['speaker_diarization']:
             self.diarize_model = whisperx.DiarizationPipeline(
                 use_auth_token=None,  # For HuggingFace models
                 device=self.device
             )
-        
+
         self.engine = "whisperx"
-    
+
     def transcribe(self, audio_path: str) -> Iterator[Dict[str, Any]]:
         """
         Transcribe audio and yield segments.
-        
+
         Returns:
             Iterator of segments with:
             - text: str
@@ -1224,7 +1224,7 @@ class Transcriber:
             yield from self._transcribe_faster_whisper(audio_path)
         else:
             yield from self._transcribe_whisperx(audio_path)
-    
+
     def _transcribe_faster_whisper(self, audio_path: str) -> Iterator[Dict]:
         """Basic transcription without speakers"""
         segments, info = self.model.transcribe(
@@ -1238,7 +1238,7 @@ class Transcriber:
             ),
             beam_size=5,
         )
-        
+
         for segment in segments:
             yield {
                 'text': segment.text.strip(),
@@ -1246,11 +1246,11 @@ class Transcriber:
                 'end': segment.end,
                 'speaker': None
             }
-    
+
     def _transcribe_whisperx(self, audio_path: str) -> Iterator[Dict]:
         """Advanced transcription with speakers and word-level timing"""
         import whisperx
-        
+
         # 1. Transcribe with Whisper
         audio = whisperx.load_audio(audio_path)
         result = self.model.transcribe(
@@ -1258,7 +1258,7 @@ class Transcriber:
             language=self.config['language'],
             batch_size=16
         )
-        
+
         # 2. Align whisper output for word-level timestamps
         result = whisperx.align(
             result["segments"],
@@ -1268,7 +1268,7 @@ class Transcriber:
             self.device,
             return_char_alignments=False
         )
-        
+
         # 3. Assign speaker labels (if enabled)
         if self.config['features']['speaker_diarization']:
             diarize_segments = self.diarize_model(audio)
@@ -1276,7 +1276,7 @@ class Transcriber:
                 diarize_segments,
                 result
             )
-        
+
         # 4. Yield segments
         for segment in result["segments"]:
             yield {
@@ -1359,7 +1359,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         echo "❌ Homebrew required: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
         exit 1
     fi
-    
+
     echo "📦 Installing PortAudio..."
     brew install portaudio
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -1491,20 +1491,20 @@ def test_transcript_survives_mid_recording_crash(tmp_path):
     """GIVEN recording in progress
     WHEN process crashes mid-recording
     THEN partial transcript is preserved"""
-    
+
     recorder = Recorder(save_dir=tmp_path)
     recorder.start_recording()
-    
+
     # Simulate some recording
     time.sleep(2)
-    
+
     # Simulate crash (kill process, don't cleanup)
     os.kill(os.getpid(), signal.SIGKILL)
-    
+
     # Restart and check
     files = list(tmp_path.glob("*.md"))
     assert len(files) == 1
-    
+
     content = files[0].read_text()
     assert "status: recording" in content  # Incomplete
     assert len(content) > 100  # Some content saved
@@ -1513,7 +1513,7 @@ def test_append_is_atomic_even_with_concurrent_writes():
     """GIVEN multiple threads appending to transcript
     WHEN concurrent writes occur
     THEN no data corruption occurs"""
-    
+
     # Test atomic append under concurrent load
     # ...
 
@@ -1521,7 +1521,7 @@ def test_full_transcript_preserved_if_ai_enhancement_fails():
     """GIVEN transcript completed
     WHEN Ollama AI enhancement fails
     THEN full transcript still saved and accessible"""
-    
+
     # ...
 ```
 
@@ -1534,17 +1534,17 @@ def test_16_minute_recording_with_long_pauses():
     """GIVEN 16-minute recording with 2-minute silent pauses
     WHEN transcription completes
     THEN all speech segments are captured"""
-    
+
     # Use fixture audio file
     audio_path = "tests/fixtures/audio/speech_with_silence_16min.wav"
-    
+
     transcriber = Transcriber(config)
     segments = list(transcriber.transcribe(audio_path))
-    
+
     # Verify all speech segments captured
     total_speech_time = sum(s['end'] - s['start'] for s in segments)
     assert total_speech_time > 120  # At least 2 minutes of speech
-    
+
     # Verify silence was skipped
     total_duration = 16 * 60  # 16 minutes
     assert total_speech_time < total_duration  # Silence not counted
@@ -1565,13 +1565,13 @@ def test_distinguishes_two_speakers():
     """GIVEN audio with 2 distinct speakers
     WHEN diarization enabled
     THEN segments correctly labeled"""
-    
+
     audio_path = "tests/fixtures/audio/multi_speaker_2min.wav"
     config = {'features': {'speaker_diarization': True}}
-    
+
     transcriber = Transcriber(config)
     segments = list(transcriber.transcribe(audio_path))
-    
+
     speakers = {s['speaker'] for s in segments}
     assert len(speakers) >= 2  # At least 2 speakers detected
 
@@ -1591,24 +1591,24 @@ def test_startup_time_under_5_seconds():
     """GIVEN cold start
     WHEN running 'rec' command
     THEN ready to record in < 5 seconds"""
-    
+
     start = time.time()
     subprocess.run(['rec', '--help'])
     duration = time.time() - start
-    
+
     assert duration < 5.0
 
 def test_transcription_faster_than_realtime():
     """GIVEN 60-second audio file
     WHEN transcribing
     THEN completes in < 60 seconds (faster than realtime)"""
-    
+
     audio_path = "tests/fixtures/audio/speech_60s.wav"
-    
+
     start = time.time()
     transcriber.transcribe(audio_path)
     duration = time.time() - start
-    
+
     assert duration < 60.0  # Faster than realtime
 ```
 
@@ -1628,15 +1628,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ['3.8', '3.9', '3.10', '3.11']
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       - name: Install system dependencies
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
@@ -1645,21 +1645,21 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install portaudio
           fi
-      
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      
+
       - name: Run unit tests
         run: pytest tests/unit -v --cov=src --cov-report=xml
-      
+
       - name: Run integration tests
         run: pytest tests/integration -v
-      
+
       - name: Run E2E tests
         run: pytest tests/e2e -v
-      
+
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
