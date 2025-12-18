@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from rejoice.audio import get_audio_input_devices
+from rejoice.audio import get_audio_input_devices, record_audio
 from rejoice.cli.commands import main
 
 
@@ -57,3 +57,88 @@ def test_config_list_mics_handles_no_devices_gracefully():
     assert (
         "No audio input devices" in result.output or "no audio" in result.output.lower()
     )
+
+
+def test_record_audio_uses_correct_parameters(monkeypatch):
+    """GIVEN a callback and device
+    WHEN record_audio is called
+    THEN sounddevice.InputStream is created with 16kHz mono and started."""
+
+    created_streams = []
+
+    class DummyStream:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.started = False
+            created_streams.append(self)
+
+        def start(self):
+            self.started = True
+
+    def fake_input_stream(**kwargs):
+        return DummyStream(**kwargs)
+
+    def callback(indata, frames, time, status):  # pragma: no cover - callback not run
+        pass
+
+    monkeypatch.setattr("rejoice.audio.sd.InputStream", fake_input_stream)
+
+    stream = record_audio(callback=callback, device="USB Mic")
+
+    assert created_streams, "InputStream should have been created"
+    created = created_streams[0]
+
+    assert created.kwargs["samplerate"] == 16000
+    assert created.kwargs["channels"] == 1
+    assert created.kwargs["callback"] is callback
+    assert created.kwargs["device"] == "USB Mic"
+    assert created.started is True
+    assert stream is created
+
+
+def test_record_audio_raises_if_sounddevice_unavailable(monkeypatch):
+    """GIVEN sounddevice dependency is unavailable
+    WHEN record_audio is called
+    THEN a helpful RuntimeError is raised."""
+
+    monkeypatch.setattr("rejoice.audio.sd", None)
+
+    def dummy_callback(indata, frames, time, status):  # pragma: no cover
+        pass
+
+    try:
+        record_audio(dummy_callback)
+    except RuntimeError as exc:
+        message = str(exc).lower()
+        assert "sounddevice" in message
+        assert "not available" in message or "missing" in message
+    else:  # pragma: no cover - defensive
+        raise AssertionError("record_audio() should raise RuntimeError when sd is None")
+
+
+def test_record_audio_wraps_sounddevice_errors(monkeypatch):
+    """GIVEN sounddevice raises an error when creating the stream
+    WHEN record_audio is called
+    THEN a RuntimeError with a clear message is raised."""
+
+    class BoomError(Exception):
+        pass
+
+    def boom_input_stream(**kwargs):
+        raise BoomError("device busy")
+
+    def dummy_callback(indata, frames, time, status):  # pragma: no cover
+        pass
+
+    monkeypatch.setattr("rejoice.audio.sd.InputStream", boom_input_stream)
+
+    try:
+        record_audio(dummy_callback, device="Busy Device")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert "failed to start audio input stream" in message.lower()
+        assert "device busy" in message.lower()
+    else:  # pragma: no cover - defensive
+        raise AssertionError(
+            "record_audio() should wrap sounddevice errors in RuntimeError"
+        )

@@ -506,7 +506,7 @@ def get_audio_devices():
 ### [R-002] Audio Capture Implementation
 **Priority:** Critical
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-001]
 
 **User Story:**

@@ -172,6 +172,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented `get_audio_input_devices` helper in `rejoice.audio` to enumerate input-capable devices
   - Added `rec config list-mics` CLI command to list microphones with index and default marker
   - Tests: 3 new unit tests covering device filtering and CLI behavior (all passing)
+- [R-002] Audio Capture Implementation
+  - Implemented `record_audio` helper in `rejoice.audio` using `sounddevice.InputStream` (16kHz mono, device-selectable)
+  - Added unit tests for correct stream parameters, missing dependency handling, and wrapped sounddevice errors
+  - Forms the basis for streaming audio into the recording pipeline in later stories
 
 ### Known Issues / Limitations
 
