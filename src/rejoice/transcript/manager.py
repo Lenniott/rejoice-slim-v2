@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Tuple
 
+import yaml
+
 from rejoice.exceptions import TranscriptError
 
 
@@ -172,3 +174,74 @@ def append_to_transcript(filepath: Path, text: str) -> None:
     updated = existing + text + "\n"
 
     write_file_atomic(filepath, updated)
+
+
+def update_status(filepath: Path, status: str) -> None:
+    """Update the ``status`` field in a transcript's YAML frontmatter.
+
+    The operation is performed atomically via :func:`write_file_atomic` to
+    preserve the zero data loss guarantee. All other frontmatter fields and
+    the body content are preserved.
+
+    Args:
+        filepath: Path to the transcript markdown file.
+        status: New status value (for example, ``\"completed\"`` or
+            ``\"cancelled\"``).
+
+    Raises:
+        TranscriptError: If the transcript does not contain valid YAML
+        frontmatter.
+    """
+    raw = filepath.read_text(encoding="utf-8")
+
+    # Expect standard frontmatter markers at the top of the file.
+    if not raw.startswith("---"):
+        raise TranscriptError(
+            "Transcript file is missing YAML frontmatter.",
+            suggestion="Ensure transcripts are created via the transcript manager.",
+        )
+
+    try:
+        # Find the first pair of frontmatter delimiters.
+        first_sep_end = raw.index("\n", 3)  # end of initial '---\n'
+        second_sep_start = raw.index("\n---", first_sep_end)
+    except ValueError as exc:  # pragma: no cover - defensive; tested via error paths
+        raise TranscriptError(
+            "Transcript frontmatter is malformed.",
+            suggestion=(
+                "Check the transcript file for manual edits " "to the '---' markers."
+            ),
+        ) from exc
+
+    frontmatter_block = raw[first_sep_end + 1 : second_sep_start]
+    body = raw[second_sep_start + len("\n---\n") :]
+
+    try:
+        data = yaml.safe_load(frontmatter_block) or {}
+    except yaml.YAMLError as exc:  # pragma: no cover - defensive
+        raise TranscriptError(
+            "Transcript frontmatter contains invalid YAML.",
+            suggestion="Recreate the transcript or fix the frontmatter formatting.",
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise TranscriptError(
+            "Transcript frontmatter must be a mapping.",
+            suggestion="Ensure the YAML frontmatter is a key/value mapping.",
+        )
+
+    data["status"] = status
+
+    # Rebuild frontmatter with the updated status. We use safe_dump to avoid
+    # manual string manipulation, then normalise it back into the expected
+    # `---\n...---\n\n` structure.
+    yaml_block = yaml.safe_dump(
+        data,
+        default_flow_style=False,
+        sort_keys=False,
+    ).rstrip("\n")
+
+    new_frontmatter = f"---\n{yaml_block}\n---\n\n"
+    new_content = new_frontmatter + body.lstrip("\n")
+
+    write_file_atomic(filepath, new_content)

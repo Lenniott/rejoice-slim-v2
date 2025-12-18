@@ -2,9 +2,10 @@
 from pathlib import Path
 from typing import List, Tuple
 
+import click
 from click.testing import CliRunner
 
-from rejoice.cli.commands import main, start_recording_session
+from rejoice.cli.commands import main, start_recording_session, _default_wait_for_stop
 
 
 def test_cli_help():
@@ -67,7 +68,7 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
     WHEN start_recording_session is called
     THEN transcript file is created before audio capture starts."""
 
-    events: List[str] = []
+    events: List[object] = []
 
     # Fake transcript creation that records order and returns a path/id
     def fake_create_transcript(save_dir: Path):
@@ -108,6 +109,11 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
         "rejoice.cli.commands.record_audio",
         fake_record_audio,
     )
+    # Avoid touching the filesystem for status updates in this ordering test.
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: events.append(("update_status", path, status)),
+    )
 
     # Call the helper under test
     filepath, transcript_id = start_recording_session(wait_for_stop=fake_wait_for_stop)
@@ -122,3 +128,89 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
     # The fake stream should be stopped and closed
     assert fake_stream.stopped is True
     assert fake_stream.closed is True
+
+
+def test_default_wait_for_stop_uses_enter_and_getchar(monkeypatch, capsys):
+    """GIVEN the default wait_for_stop implementation
+    WHEN it is invoked
+    THEN it prompts for Enter and calls click.getchar().
+    """
+    calls = {"getchar_called": False}
+
+    def fake_getchar() -> str:
+        calls["getchar_called"] = True
+        # Simulate user pressing Enter
+        return "\n"
+
+    monkeypatch.setattr(click, "getchar", fake_getchar)
+
+    _default_wait_for_stop()
+
+    captured = capsys.readouterr()
+    assert "Press Enter to stop recording." in captured.out
+    assert calls["getchar_called"] is True
+
+
+def test_start_recording_marks_transcript_completed(monkeypatch, tmp_path):
+    """GIVEN a recording session
+    WHEN start_recording_session finishes normally
+    THEN the transcript status is updated to 'completed' via the manager helper.
+    """
+    events: List[object] = []
+
+    # Use a real file path so status update helpers have something to operate on
+    transcript_path = tmp_path / "transcript_20250101_000010.md"
+    transcript_path.write_text("initial content", encoding="utf-8")
+
+    def fake_create_transcript(save_dir: Path):
+        events.append("create_transcript")
+        return transcript_path, "000010"
+
+    class FakeStream:
+        def __init__(self) -> None:
+            self.stopped = False
+            self.closed = False
+
+        def stop(self) -> None:
+            self.stopped = True
+
+        def close(self) -> None:
+            self.closed = True
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        events.append("record_audio")
+        assert callable(callback)
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        events.append("wait_for_stop")
+
+    def fake_update_status(path: Path, status: str) -> None:
+        events.append(("update_status", path, status))
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        fake_update_status,
+    )
+
+    filepath, transcript_id = start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Core flow order still respected
+    assert events[0:3] == ["create_transcript", "record_audio", "wait_for_stop"]
+
+    # Transcript identity is passed through
+    assert filepath == transcript_path
+    assert transcript_id == "000010"
+
+    # And status is updated to completed at the end of the session
+    assert ("update_status", transcript_path, "completed") in events

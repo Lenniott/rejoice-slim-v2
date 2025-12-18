@@ -12,7 +12,7 @@ from rejoice.audio import record_audio
 from rejoice.cli.config_commands import config_group
 from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
-from rejoice.transcript.manager import create_transcript
+from rejoice.transcript.manager import create_transcript, update_status
 
 console = Console()
 
@@ -23,7 +23,7 @@ def _default_wait_for_stop() -> None:
     Currently implemented as a simple keypress prompt; later stories
     ([R-007], [R-008]) build on this for richer control.
     """
-    console.print("[bold]Press any key to stop recording.[/bold]")
+    console.print("[bold]Press Enter to stop recording.[/bold]")
     try:
         click.getchar()
     except (KeyboardInterrupt, EOFError):
@@ -88,6 +88,11 @@ def start_recording_session(
         duration_seconds = int(time.time() - start_time)
         minutes, seconds = divmod(duration_seconds, 60)
         console.print(f"⏱️  Duration: {minutes:d}:{seconds:02d}")
+
+    # 5. Finalise the transcript frontmatter to reflect a completed recording.
+    update_status(filepath, "completed")
+    console.print("\n✅ Recording stopped. Transcript marked as [bold]completed[/bold].")
+    console.print(f"📄 File saved at: {filepath}")
 
     return filepath, transcript_id
 

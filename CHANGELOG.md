@@ -189,6 +189,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Implemented `start_recording_session` helper in `rejoice.cli.commands` to coordinate config loading, transcript creation, and audio capture
    - Wired default `rec` invocation (no subcommand) to start a recording session immediately, printing transcript path and a simple duration summary
    - Added CLI unit tests to verify that `rec` triggers a recording session and that transcript creation happens before audio capture, with clean stream shutdown
+ - [R-007] Recording Control - Stop
+   - Extended `start_recording_session` to finalise recordings by updating transcript frontmatter status to `completed` and printing a clear success message with file location
+   - Implemented `update_status` helper in `rejoice.transcript.manager` to atomically update YAML frontmatter while preserving body content
+   - Added unit tests covering CLI stop behaviour, default keypress handling for Enter, and frontmatter status updates performed via atomic writes
 
 ### Known Issues / Limitations
 

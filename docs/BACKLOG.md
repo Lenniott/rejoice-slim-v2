@@ -748,7 +748,7 @@ def record():
 ### [R-007] Recording Control - Stop
 **Priority:** Critical
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-006]
 
 **User Story:**

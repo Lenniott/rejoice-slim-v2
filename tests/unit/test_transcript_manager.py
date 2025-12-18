@@ -212,3 +212,58 @@ def test_append_to_transcript_is_atomic(tmp_path: Path):
     # We should never see a partially-written file; content is either old or full new
     assert after != ""
     assert before in after
+
+
+def test_update_status_updates_frontmatter_only(tmp_path: Path):
+    """GIVEN an existing transcript
+    WHEN update_status is called
+    THEN the status field in the YAML frontmatter is updated
+    AND the body content is preserved.
+    """
+    save_dir = tmp_path
+    filepath, tid = manager.create_transcript(save_dir)
+
+    # Append some body content so we can verify it is preserved
+    manager.append_to_transcript(filepath, "Body content line 1.")
+    manager.append_to_transcript(filepath, "Body content line 2.")
+
+    original_content = read_file(filepath)
+    assert f"id: '{tid}'" in original_content
+    assert "status: recording" in original_content
+    assert "Body content line 1." in original_content
+    assert "Body content line 2." in original_content
+
+    # WHEN: we update status to completed
+    manager.update_status(filepath, "completed")
+
+    updated_content = read_file(filepath)
+
+    # THEN: status is updated, id and body are unchanged
+    assert f"id: '{tid}'" in updated_content
+    assert "status: completed" in updated_content
+    assert "status: recording" not in updated_content
+    assert "Body content line 1." in updated_content
+    assert "Body content line 2." in updated_content
+
+
+def test_update_status_is_atomic(tmp_path: Path, monkeypatch):
+    """GIVEN an existing transcript
+    WHEN update_status is called
+    THEN the file is rewritten atomically via write_file_atomic.
+    """
+    save_dir = tmp_path
+    filepath, _tid = manager.create_transcript(save_dir)
+
+    # Patch write_file_atomic to record that it was used. We don't need to
+    # delegate to the real implementation here; this test only asserts that
+    # update_status *routes* writes through the atomic helper.
+    calls = {"used": False}
+
+    def fake_write_file_atomic(target, content):
+        calls["used"] = True
+
+    monkeypatch.setattr(manager, "write_file_atomic", fake_write_file_atomic)
+
+    manager.update_status(filepath, "completed")
+
+    assert calls["used"] is True
