@@ -144,12 +144,12 @@ def start_recording_session(
     return filepath, transcript_id
 
 
-def _iter_transcripts(save_dir: Path):
+def _iter_transcripts(save_dir: Path) -> list[Path]:
     """Yield transcript files in the given directory matching the standard pattern."""
     if not save_dir.exists():
         return []
 
-    files = []
+    files: list[Path] = []
     for entry in save_dir.iterdir():
         if not entry.is_file():
             continue
@@ -157,7 +157,7 @@ def _iter_transcripts(save_dir: Path):
             files.append(entry)
 
     # Sort by date (derived from filename) and ID, newest first.
-    def sort_key(path: Path):
+    def sort_key(path: Path) -> tuple[str, str]:
         match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
         assert match is not None  # Covered by construction above
         date_str, id_str = match.groups()
@@ -185,7 +185,7 @@ def _get_transcript_path_by_id(save_dir: Path, user_supplied_id: str) -> Path | 
     """Resolve a user-supplied transcript ID to an existing file path.
 
     The ID is normalised via :func:`normalize_id` to allow flexible input
-    (for example ``\"1\"`` or ``\"000001\"``) while still relying on the
+    (for example ``"1"`` or ``"000001"``) while still relying on the
     standard filename pattern.
     """
     normalised_id = normalize_id(user_supplied_id)

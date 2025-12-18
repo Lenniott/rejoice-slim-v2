@@ -597,7 +597,7 @@ As a user, I want transcripts saved immediately when I start recording so that I
 - [x] Create MD file with unique ID on record start
 - [x] Generate next available ID (000001, 000002, etc.)
 - [x] Add YAML frontmatter with metadata
-- [ ] File naming: `ID_transcript_YYYYMMDD.md`
+- [x] File naming: `transcript_YYYYMMDD_ID.md`
 - [x] Save to configured directory
 - [x] Handle directory creation if needed
 - [x] Atomic file creation (temp + rename)
@@ -679,11 +679,11 @@ def append_to_transcript(filepath: Path, text: str):
 As a user, I want to type just "1" instead of "000001" so that commands are faster and easier.
 
 **Acceptance Criteria:**
-- [ ] Accept "1", "01", "001", "000001" - all work
-- [ ] Normalize to 6-digit format internally
-- [ ] Display padded format in listings
-- [ ] Case-insensitive ID lookup
-- [ ] Handle invalid IDs gracefully
+- [x] Accept "1", "01", "001", "000001" - all work
+- [x] Normalize to 6-digit format internally
+- [x] Display padded format in listings
+- [x] Case-insensitive ID lookup
+- [x] Handle invalid IDs gracefully
 
 **Technical Notes:**
 ```python
@@ -917,6 +917,35 @@ class AudioBuffer:
 **Test Requirements:**
 - Test thread safety
 - Test overflow handling
+
+---
+
+### [R-011] Transcript Filename Order Normalisation
+**Priority:** Medium
+**Estimate:** S (2-4h)
+**Status:** ❌ Not Started
+**Dependencies:** [R-003], [R-005]
+
+**User Story:**
+As a user, I want transcript IDs at the start of filenames so that files are always ordered by ID in any file browser, even outside Rejoice.
+
+**Acceptance Criteria:**
+- [ ] New transcripts use `ID_transcript_YYYYMMDD.md` as the filename.
+- [ ] Existing transcripts with `transcript_YYYYMMDD_ID.md` continue to be recognised by all commands.
+- [ ] Listing and view commands show a consistent padded ID regardless of filename style.
+- [ ] A one-time migration helper can safely rename existing files without data loss (dry-run mode included).
+- [ ] Behaviour is fully covered by unit tests for both old and new filename patterns.
+
+**Technical Notes:**
+```python
+# Extend TRANSCRIPT_FILENAME_PATTERN to support both variants during migration,
+# and prefer the new ID-first pattern for new files created by create_transcript().
+```
+
+**Test Requirements:**
+- Unit tests for filename parsing of both old and new patterns.
+- Unit tests for creating new transcripts with the new pattern.
+- Unit/integration tests for the migration helper (including dry-run).
 - Test read/write operations
 - Test buffer size limits
 
