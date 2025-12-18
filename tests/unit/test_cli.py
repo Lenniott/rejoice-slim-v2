@@ -5,7 +5,12 @@ from typing import List, Tuple
 import click
 from click.testing import CliRunner
 
-from rejoice.cli.commands import main, start_recording_session, _default_wait_for_stop
+from rejoice.cli.commands import (
+    _default_wait_for_stop,
+    main,
+    start_recording_session,
+    view_transcript,
+)
 
 
 def test_cli_help():
@@ -376,3 +381,233 @@ def test_list_recordings_shows_transcripts_sorted_newest_first(monkeypatch, tmp_
     assert "2025-01-02" in output_lines[1]
     assert "000001" in output_lines[2]
     assert "2025-01-01" in output_lines[2]
+
+
+def test_view_transcript_by_id_hides_frontmatter_by_default(monkeypatch, tmp_path):
+    """GIVEN an existing transcript
+    WHEN `rec view <id>` is invoked
+    THEN the body is shown and YAML frontmatter is hidden by default.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    transcript_path = save_dir / "transcript_20250101_000001.md"
+    transcript_path.write_text(
+        (
+            "---\n"
+            "id: '000001'\n"
+            "type: voice-note\n"
+            "status: completed\n"
+            "created: 2025-01-01 10:00\n"
+            "language: en\n"
+            "tags: []\n"
+            'summary: ""\n'
+            "---\n\n"
+            "# My Note\n\n"
+            "This is the body of the transcript.\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    # Use a short numeric ID to exercise ID normalisation.
+    result = runner.invoke(view_transcript, ["1"])
+
+    assert result.exit_code == 0
+    # Body content should be rendered
+    assert "My Note" in result.output
+    assert "This is the body of the transcript." in result.output
+    # Frontmatter keys should not be shown by default
+    assert "id: '000001'" not in result.output
+    assert "status: completed" not in result.output
+
+
+def test_view_transcript_with_show_frontmatter_displays_metadata(
+    monkeypatch,
+    tmp_path,
+):
+    """GIVEN an existing transcript
+    WHEN `rec view --show-frontmatter <id>` is invoked
+    THEN both YAML frontmatter and body are displayed.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    transcript_path = save_dir / "transcript_20250102_000010.md"
+    transcript_path.write_text(
+        (
+            "---\n"
+            "id: '000010'\n"
+            "type: voice-note\n"
+            "status: completed\n"
+            "created: 2025-01-02 12:00\n"
+            "language: en\n"
+            "tags: []\n"
+            'summary: ""\n'
+            "---\n\n"
+            "## Heading\n\n"
+            "Body content here.\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(view_transcript, ["--show-frontmatter", "10"])
+
+    assert result.exit_code == 0
+    # Frontmatter metadata should be visible
+    assert "id: '000010'" in result.output
+    assert "status: completed" in result.output
+    # Body content should also be shown
+    assert "Heading" in result.output
+    assert "Body content here." in result.output
+
+
+def test_view_latest_shows_most_recent_transcript(monkeypatch, tmp_path):
+    """GIVEN multiple transcripts
+    WHEN `rec view latest` is invoked
+    THEN the most recent transcript (by filename pattern) is displayed.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    older = save_dir / "transcript_20250101_000001.md"
+    newer = save_dir / "transcript_20250102_000002.md"
+
+    older.write_text(
+        (
+            "---\n"
+            "id: '000001'\n"
+            "type: voice-note\n"
+            "status: completed\n"
+            "created: 2025-01-01 09:00\n"
+            "language: en\n"
+            "tags: []\n"
+            'summary: ""\n'
+            "---\n\n"
+            "Older transcript body.\n"
+        ),
+        encoding="utf-8",
+    )
+    newer.write_text(
+        (
+            "---\n"
+            "id: '000002'\n"
+            "type: voice-note\n"
+            "status: completed\n"
+            "created: 2025-01-02 10:00\n"
+            "language: en\n"
+            "tags: []\n"
+            'summary: ""\n'
+            "---\n\n"
+            "NEWEST transcript body.\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(view_transcript, ["latest"])
+
+    assert result.exit_code == 0
+    assert "NEWEST transcript body." in result.output
+    assert "Older transcript body." not in result.output
+
+
+def test_view_invalid_id_shows_clear_error(monkeypatch, tmp_path):
+    """GIVEN an invalid transcript ID
+    WHEN `rec view` is invoked
+    THEN a clear error message is shown and the command fails.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(view_transcript, ["abc"])
+
+    assert result.exit_code != 0
+    assert "is not a valid transcript ID" in result.output
+
+
+def test_view_missing_transcript_shows_friendly_message(monkeypatch, tmp_path):
+    """GIVEN a well-formed ID that does not correspond to any file
+    WHEN `rec view` is invoked
+    THEN a friendly 'not found' message is shown and the command fails.
+    """
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str) -> None:
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str) -> None:
+            self.output = FakeOutputConfig(save_path)
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(str(save_dir)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(view_transcript, ["42"])
+
+    assert result.exit_code != 0
+    assert "Transcript with ID 000042 was not found" in result.output

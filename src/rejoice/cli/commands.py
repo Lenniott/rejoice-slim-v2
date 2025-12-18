@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.prompt import Confirm
 from rich.table import Table
 
@@ -14,9 +15,11 @@ from rejoice.audio import record_audio
 from rejoice.cli.config_commands import config_group
 from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
+from rejoice.exceptions import TranscriptError
 from rejoice.transcript.manager import (
     TRANSCRIPT_FILENAME_PATTERN,
     create_transcript,
+    normalize_id,
     update_status,
 )
 
@@ -164,6 +167,67 @@ def _iter_transcripts(save_dir: Path):
     return files
 
 
+def _get_transcript_dir() -> Path:
+    """Return the transcripts directory from the loaded configuration."""
+    config = load_config()
+    return Path(config.output.save_path).expanduser()
+
+
+def _get_latest_transcript_path(save_dir: Path) -> Path | None:
+    """Return the most recent transcript path, or ``None`` if none exist."""
+    transcripts = _iter_transcripts(save_dir)
+    if not transcripts:
+        return None
+    return transcripts[0]
+
+
+def _get_transcript_path_by_id(save_dir: Path, user_supplied_id: str) -> Path | None:
+    """Resolve a user-supplied transcript ID to an existing file path.
+
+    The ID is normalised via :func:`normalize_id` to allow flexible input
+    (for example ``\"1\"`` or ``\"000001\"``) while still relying on the
+    standard filename pattern.
+    """
+    normalised_id = normalize_id(user_supplied_id)
+
+    for entry in save_dir.iterdir():
+        if not entry.is_file():
+            continue
+        match = TRANSCRIPT_FILENAME_PATTERN.match(entry.name)
+        if not match:
+            continue
+        _date_str, id_str = match.groups()
+        if id_str == normalised_id:
+            return entry
+
+    return None
+
+
+def _split_frontmatter(content: str) -> tuple[str, str]:
+    """Split transcript content into YAML frontmatter and body.
+
+    Returns a tuple of ``(frontmatter, body)`` where ``frontmatter`` is an
+    empty string if no valid frontmatter block is present.
+    """
+    if not content.startswith("---"):
+        return "", content
+
+    try:
+        first_sep_end = content.index("\n", 3)
+        second_sep_start = content.index("\n---", first_sep_end)
+    except ValueError as exc:
+        raise TranscriptError(
+            "Transcript frontmatter is malformed.",
+            suggestion=(
+                "Check the transcript file for manual edits to the '---' markers."
+            ),
+        ) from exc
+
+    frontmatter_block = content[0 : second_sep_start + len("\n---\n")]
+    body = content[second_sep_start + len("\n---\n") :]
+    return frontmatter_block.strip("\n"), body.lstrip("\n")
+
+
 @click.group(invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Show version and exit")
 @click.option("--debug", is_flag=True, help="Enable debug mode")
@@ -228,6 +292,54 @@ def list_recordings(limit: int = 50):
         table.add_row(id_str, formatted_date, path.name)
 
     console.print(table)
+
+
+@main.command("view")
+@click.argument("transcript_id", default="latest")
+@click.option(
+    "--show-frontmatter/--hide-frontmatter",
+    default=False,
+    help="Show or hide YAML frontmatter metadata.",
+)
+def view_transcript(transcript_id: str, show_frontmatter: bool) -> None:
+    """View a transcript in the terminal implementing [C-003].
+
+    Supports ``rec view <id>`` and ``rec view latest``. Markdown is rendered
+    using Rich and long transcripts are paginated.
+    """
+    save_dir = _get_transcript_dir()
+
+    try:
+        if transcript_id == "latest":
+            path = _get_latest_transcript_path(save_dir)
+        else:
+            path = _get_transcript_path_by_id(save_dir, transcript_id)
+    except TranscriptError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise click.Abort() from exc
+
+    if path is None:
+        if transcript_id == "latest":
+            console.print("No transcripts found to display.")
+        else:
+            # Normalise for user-friendly error without raising again.
+            normalised = normalize_id(transcript_id)
+            console.print(
+                f"Transcript with ID {normalised} was not found in your transcripts "
+                "directory.",
+            )
+        raise click.Abort()
+
+    raw = path.read_text(encoding="utf-8")
+    frontmatter_block, body = _split_frontmatter(raw)
+
+    if show_frontmatter and frontmatter_block:
+        console.print("[bold]Metadata[/bold]")
+        console.print(frontmatter_block)
+        console.print()
+
+    markdown = Markdown(body or "")
+    console.print(markdown)
 
 
 # Add config subcommand group

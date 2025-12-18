@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Introduced a `normalize_id` helper in `transcript/manager.py` to convert flexible numeric input like `"1"`, `"01"` or `"000001"` into the canonical zero-padded 6-digit transcript ID.
   - Added unit tests covering valid formats, non-numeric inputs, and out-of-range values (zero, negative and too-large IDs), keeping transcript ID handling predictable and safe for future CLI commands.
 
+- [C-003] View Transcript Command
+  - Added a `rec view` CLI subcommand (and underlying `view_transcript` helper) to display individual transcripts or the latest recording directly in the terminal with Rich-powered Markdown rendering.
+  - Supports flexible numeric IDs via the shared `normalize_id` helper, optional display of YAML frontmatter metadata, and clear error messages when IDs are invalid or transcripts are missing.
+  - Introduced unit tests exercising viewing by ID, viewing the latest transcript, metadata visibility toggling, and error handling paths.
+
 - [R-008] Recording Control - Cancel
   - Extended `start_recording_session` in `cli/commands.py` to treat `Ctrl+C` as an explicit cancel flow with confirmation.
   - Implemented optional transcript deletion or safe cancellation by marking frontmatter status as `cancelled`, always cleaning up the audio stream.

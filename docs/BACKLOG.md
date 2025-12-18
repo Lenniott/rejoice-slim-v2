@@ -597,7 +597,7 @@ As a user, I want transcripts saved immediately when I start recording so that I
 - [x] Create MD file with unique ID on record start
 - [x] Generate next available ID (000001, 000002, etc.)
 - [x] Add YAML frontmatter with metadata
-- [x] File naming: `transcript_YYYYMMDD_ID.md`
+- [ ] File naming: `ID_transcript_YYYYMMDD.md`
 - [x] Save to configured directory
 - [x] Handle directory creation if needed
 - [x] Atomic file creation (temp + rename)
@@ -608,7 +608,7 @@ def create_transcript(save_dir: Path) -> tuple[Path, str]:
     """Create new transcript file immediately"""
     transcript_id = get_next_id(save_dir)
     date_str = datetime.now().strftime("%Y%m%d")
-    filename = f"transcript_{date_str}_{transcript_id}.md"
+    filename = f"{transcript_id}_transcript_{date_str}.md"
 
     frontmatter = generate_frontmatter(transcript_id)
     filepath = save_dir / filename
@@ -1903,7 +1903,7 @@ def list_recordings(
 ### [C-003] View Transcript Command
 **Priority:** High
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-005]
 
 **User Story:**
