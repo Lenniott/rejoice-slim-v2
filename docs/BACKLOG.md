@@ -8,10 +8,10 @@
 
 ## 📊 Progress Overview
 
-- **Total Stories:** 91
-- **Completed:** 18
+- **Total Stories:** 82
+- **Completed:** 21
 - **In Progress:** 0
-- **Not Started:** 73
+- **Not Started:** 61
 
 ---
 
@@ -29,7 +29,7 @@ These priority tiers sit **above phases**. When choosing what to work on next:
   - ✅ [I-001], ✅ [I-002], ✅ [I-003], ✅ [I-004]
   - ✅ [F-001], ✅ [F-002], ✅ [F-003], ✅ [F-004], ✅ [F-005], ✅ [F-006]
 - Core recording & transcripts:
-  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ❌ [R-007], ❌ [R-008]
+  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ❌ [R-008]
 - Core transcription:
   - ❌ [T-001], ❌ [T-002], ❌ [T-003]
 - Core user commands:
@@ -269,13 +269,13 @@ fi
 As a developer, I want a well-organized project structure so that the codebase is easy to navigate and maintain.
 
 **Acceptance Criteria:**
-- [ ] Directory structure follows Python best practices
-- [ ] `src/` for source code
-- [ ] `tests/` with unit/integration/e2e subdirectories
-- [ ] `docs/` for documentation
-- [ ] `scripts/` for installation/setup scripts
-- [ ] `.github/workflows/` for CI/CD
-- [ ] Root level: README, LICENSE, pyproject.toml
+- [x] Directory structure follows Python best practices
+- [x] `src/` for source code
+- [x] `tests/` with unit/integration/e2e subdirectories
+- [x] `docs/` for documentation
+- [x] `scripts/` for installation/setup scripts
+- [x] `.github/workflows/` for CI/CD
+- [x] Root level: README, LICENSE, pyproject.toml
 
 **Technical Notes:**
 ```
@@ -313,12 +313,12 @@ rejoice-v2/
 As a developer, I want proper package configuration so that installation and dependency management is straightforward.
 
 **Acceptance Criteria:**
-- [ ] `pyproject.toml` configured with Poetry or setuptools
-- [ ] Project metadata defined (name, version, authors)
-- [ ] Dependencies specified with version constraints
-- [ ] Dev dependencies separated
-- [ ] Entry points defined for `rec` command
-- [ ] Python version requirement (>= 3.8)
+- [x] `pyproject.toml` configured with Poetry or setuptools
+- [x] Project metadata defined (name, version, authors)
+- [x] Dependencies specified with version constraints
+- [x] Dev dependencies separated
+- [x] Entry points defined for `rec` command
+- [x] Python version requirement (>= 3.8)
 
 **Technical Notes:**
 ```toml
@@ -347,12 +347,12 @@ rec = "rejoice.cli:main"
 As a developer, I want a comprehensive testing framework so that I can practice TDD and maintain high code quality.
 
 **Acceptance Criteria:**
-- [ ] pytest configured
-- [ ] pytest-cov for coverage reports
-- [ ] pytest-asyncio for async tests
-- [ ] Test fixtures structure created
-- [ ] Sample test files for each test type
-- [ ] Coverage reporting configured (90% target)
+- [x] pytest configured
+- [x] pytest-cov for coverage reports
+- [x] pytest-asyncio for async tests
+- [x] Test fixtures structure created
+- [x] Sample test files for each test type
+- [x] Coverage reporting configured (90% target)
 - [ ] Pre-commit hooks for running tests
 
 **Technical Notes:**
@@ -382,13 +382,13 @@ addopts = -v --cov=src --cov-report=html --cov-report=term
 As a user, I want a flexible configuration system so that I can customize Rejoice to my preferences without editing code.
 
 **Acceptance Criteria:**
-- [ ] `config.yaml` format designed
-- [ ] `.env` support for sensitive values
-- [ ] Config validation with schema
-- [ ] Default configuration included
-- [ ] User config overrides defaults
-- [ ] Config location: `~/.config/rejoice/config.yaml`
-- [ ] `rec config` commands work
+- [x] `config.yaml` format designed
+- [x] `.env` support for sensitive values
+- [x] Config validation with schema
+- [x] Default configuration included
+- [x] User config overrides defaults
+- [x] Config location: `~/.config/rejoice/config.yaml`
+- [x] `rec config` commands work
 
 **Technical Notes:**
 ```yaml
@@ -432,13 +432,13 @@ ai:
 As a user, I want intuitive CLI commands so that I can interact with Rejoice naturally.
 
 **Acceptance Criteria:**
-- [ ] Click or Typer framework configured
-- [ ] Main `rec` command works
-- [ ] Subcommands structure established
-- [ ] `--help` provides clear information
-- [ ] `--version` shows version
-- [ ] `--debug` flag available globally
-- [ ] Color output with rich library
+- [x] Click or Typer framework configured
+- [x] Main `rec` command works
+- [x] Subcommands structure established
+- [x] `--help` provides clear information
+- [x] `--version` shows version
+- [x] `--debug` flag available globally
+- [x] Color output with rich library
 
 **Technical Notes:**
 ```python
@@ -477,12 +477,12 @@ def list():
 As a user/developer, I want clear logging so that I can troubleshoot issues and understand what's happening.
 
 **Acceptance Criteria:**
-- [ ] Structured logging with Python logging module
-- [ ] Different log levels (DEBUG, INFO, WARNING, ERROR)
-- [ ] Log to file: `~/.config/rejoice/logs/rejoice.log`
-- [ ] Console output respects `--debug` flag
-- [ ] Log rotation configured (max 10MB, 5 files)
-- [ ] Pretty formatting for terminal output
+- [x] Structured logging with Python logging module
+- [x] Different log levels (DEBUG, INFO, WARNING, ERROR)
+- [x] Log to file: `~/.config/rejoice/logs/rejoice.log`
+- [x] Console output respects `--debug` flag
+- [x] Log rotation configured (max 10MB, 5 files)
+- [x] Pretty formatting for terminal output
 
 **Technical Notes:**
 ```python
@@ -518,10 +518,10 @@ logging.basicConfig(
 As a user, I want Rejoice to detect my microphone automatically so that I don't have to configure anything manually.
 
 **Acceptance Criteria:**
-- [ ] Detect available audio input devices
-- [ ] Handle no devices gracefully
-- [ ] Show device list with `rec config list-mics`
-- [ ] Default to system default device
+- [x] Detect available audio input devices
+- [x] Handle no devices gracefully
+- [x] Show device list with `rec config list-mics`
+- [x] Default to system default device
 - [ ] Support device selection by index or name
 - [ ] Test concurrent access (Zoom + Rejoice)
 
@@ -552,11 +552,11 @@ def get_audio_devices():
 As a user, I want to record audio from my microphone so that I can capture spoken content.
 
 **Acceptance Criteria:**
-- [ ] Capture audio using sounddevice
-- [ ] Sample rate: 16kHz (Whisper requirement)
-- [ ] Mono channel
-- [ ] Real-time streaming to buffer
-- [ ] Handle audio device errors
+- [x] Capture audio using sounddevice
+- [x] Sample rate: 16kHz (Whisper requirement)
+- [x] Mono channel
+- [x] Real-time streaming to buffer
+- [x] Handle audio device errors
 - [ ] Work concurrently with other apps
 - [ ] Clean start/stop without clicks
 
@@ -639,12 +639,12 @@ def create_transcript(save_dir: Path) -> tuple[Path, str]:
 As a system, I want to append transcribed text to the file in real-time so that partial transcripts are never lost.
 
 **Acceptance Criteria:**
-- [ ] Append text to existing file
-- [ ] Preserve frontmatter
-- [ ] Atomic append operation (read + write temp + rename)
+- [x] Append text to existing file
+- [x] Preserve frontmatter
+- [x] Atomic append operation (read + write temp + rename)
 - [ ] Handle concurrent write safety
 - [ ] No data corruption on crash
-- [ ] Maintain proper line breaks
+- [x] Maintain proper line breaks
 
 **Technical Notes:**
 ```python
@@ -713,12 +713,12 @@ def normalize_id(user_input: str) -> str:
 As a user, I want to type "rec" and immediately start recording so that capturing ideas is effortless.
 
 **Acceptance Criteria:**
-- [ ] `rec` command starts recording
-- [ ] Create transcript file first
-- [ ] Start audio capture
-- [ ] Show recording indicator
-- [ ] Display duration counter
-- [ ] Handle Ctrl+C gracefully
+- [x] `rec` command starts recording
+- [x] Create transcript file first
+- [x] Start audio capture
+- [x] Show recording indicator
+- [x] Display duration counter
+- [x] Handle Ctrl+C gracefully
 
 **Technical Notes:**
 ```python
@@ -755,11 +755,11 @@ def record():
 As a user, I want to press Enter to stop recording so that I have an obvious, simple way to finish.
 
 **Acceptance Criteria:**
-- [ ] Enter key stops recording cleanly
-- [ ] Finalize transcript file
-- [ ] Stop audio capture
-- [ ] Update frontmatter status to "completed"
-- [ ] Show success message with file location
+- [x] Enter key stops recording cleanly
+- [x] Finalize transcript file
+- [x] Stop audio capture
+- [x] Update frontmatter status to "completed"
+- [x] Show success message with file location
 - [ ] Show next steps
 
 **Technical Notes:**
@@ -2614,12 +2614,12 @@ if debug:
 As a user, I want Rejoice installed in an isolated virtual environment so that it doesn't conflict with my system Python packages.
 
 **Acceptance Criteria:**
-- [ ] Create venv at `~/.rejoice/venv`
-- [ ] Use system Python 3.8+
-- [ ] Install all dependencies in venv
-- [ ] Venv is completely isolated
-- [ ] No system Python pollution
-- [ ] Easy to delete (just remove `~/.rejoice/`)
+- [x] Create venv at `~/.rejoice/venv`
+- [x] Use system Python 3.8+
+- [x] Install all dependencies in venv
+- [x] Venv is completely isolated
+- [x] No system Python pollution
+- [x] Easy to delete (just remove `~/.rejoice/`)
 
 **Technical Notes:**
 ```bash
@@ -2663,12 +2663,12 @@ pip install rejoice
 As a user, I want to type `rec` from anywhere so that I don't need to remember the full path to the venv.
 
 **Acceptance Criteria:**
-- [ ] Detect user's shell (bash, zsh, fish)
-- [ ] Add alias to appropriate rc file
-- [ ] Alias: `alias rec="~/.rejoice/venv/bin/rec"`
-- [ ] Alias works immediately (source rc file)
-- [ ] Handle multiple shell configurations
-- [ ] Don't duplicate aliases on reinstall
+- [x] Detect user's shell (bash, zsh, fish)
+- [x] Add alias to appropriate rc file
+- [x] Alias: `alias rec="~/.rejoice/venv/bin/rec"`
+- [x] Alias works immediately (source rc file)
+- [x] Handle multiple shell configurations
+- [x] Don't duplicate aliases on reinstall
 
 **Technical Notes:**
 ```bash
@@ -2728,11 +2728,11 @@ source "$RC_FILE" 2>/dev/null || echo "Please run: source $RC_FILE"
 As a user, I want the `rec` command to automatically activate the virtual environment so that I don't have to think about it.
 
 **Acceptance Criteria:**
-- [ ] Alias directly calls venv Python
-- [ ] No manual activation needed
-- [ ] Works from any directory
-- [ ] Expands `~` correctly in alias
-- [ ] Handles spaces in paths
+- [x] Alias directly calls venv Python
+- [x] No manual activation needed
+- [x] Works from any directory
+- [x] Expands `~` correctly in alias
+- [x] Handles spaces in paths
 
 **Technical Notes:**
 ```bash
@@ -2776,15 +2776,15 @@ As a user, I want one-command installation so that setup is effortless.
 
 **Acceptance Criteria:**
 - [ ] `curl -sSL https://install.rejoice.ai | bash` works
-- [ ] Installs system dependencies (portaudio, ffmpeg)
-- [ ] Creates virtual environment
-- [ ] Installs Python package in venv
-- [ ] Sets up shell alias
-- [ ] Creates config directory
+- [x] Installs system dependencies (portaudio, ffmpeg)
+- [x] Creates virtual environment
+- [x] Installs Python package in venv
+- [x] Sets up shell alias
+- [x] Creates config directory
 - [ ] Downloads default Whisper model
 - [ ] Runs first-time setup
-- [ ] Tests installation
-- [ ] Works on macOS and Linux
+- [x] Tests installation
+- [x] Works on macOS and Linux
 
 **Technical Notes:**
 ```bash
@@ -2933,12 +2933,12 @@ echo ""
 As a user, I want clean uninstallation so that Rejoice doesn't leave system pollution.
 
 **Acceptance Criteria:**
-- [ ] `rec uninstall` removes everything
-- [ ] Remove virtual environment
-- [ ] Remove config directory (with confirmation)
-- [ ] Remove command aliases
-- [ ] Optionally keep transcripts
-- [ ] Confirmation prompts
+- [x] `rec uninstall` removes everything
+- [x] Remove virtual environment
+- [x] Remove config directory (with confirmation)
+- [x] Remove command aliases
+- [x] Optionally keep transcripts
+- [x] Confirmation prompts
 
 **Technical Notes:**
 ```bash
