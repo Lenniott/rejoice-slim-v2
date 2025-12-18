@@ -9,9 +9,9 @@
 ## 📊 Progress Overview
 
 - **Total Stories:** 82
-- **Completed:** 21
+- **Completed:** 22
 - **In Progress:** 0
-- **Not Started:** 61
+- **Not Started:** 60
 
 ---
 
@@ -29,9 +29,9 @@ These priority tiers sit **above phases**. When choosing what to work on next:
   - ✅ [I-001], ✅ [I-002], ✅ [I-003], ✅ [I-004]
   - ✅ [F-001], ✅ [F-002], ✅ [F-003], ✅ [F-004], ✅ [F-005], ✅ [F-006]
 - Core recording & transcripts:
-  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ❌ [R-008]
+  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ✅ [R-008]
 - Core transcription:
-  - ❌ [T-001], ❌ [T-002], ❌ [T-003]
+  - ✅ [T-001], ❌ [T-002], ✅ [T-003]
 - Core user commands:
   - ❌ [C-001], ❌ [C-003]
 
@@ -786,28 +786,48 @@ def stop_recording(stream, filepath):
 ### [R-008] Recording Control - Cancel
 **Priority:** High
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-006]
 
 **User Story:**
 As a user, I want to press Ctrl+C to cancel a recording so that I can discard mistakes without keeping files.
 
 **Acceptance Criteria:**
-- [ ] Ctrl+C stops recording immediately
-- [ ] Optionally delete transcript file
-- [ ] Confirm before deletion
-- [ ] Or mark as "cancelled" in frontmatter
-- [ ] Clean shutdown
+- [x] Ctrl+C stops recording immediately
+- [x] Optionally delete transcript file
+- [x] Confirm before deletion
+- [x] Or mark as "cancelled" in frontmatter
+- [x] Clean shutdown
 
 **Technical Notes:**
 ```python
-import signal
+from rich.prompt import Confirm
 
-def handle_interrupt(signum, frame):
-    if confirm("Cancel recording? (file will be deleted)"):
-        cleanup_and_exit()
+def handle_interrupt(stream, filepath):
+    # Called when KeyboardInterrupt is raised during wait_for_stop
+    cancelled = True
+    if not Confirm.ask(
+        "Cancel recording? This will stop without finalising as completed.",
+        default=True,
+    ):
+        cancelled = False
+
+    # Always stop/close the audio stream
+    stream.stop()
+    stream.close()
+
+    if cancelled:
+        # Offer optional deletion while preserving data by default
+        delete_file = Confirm.ask(
+            "Delete the partial transcript file?",
+            default=False,
+        )
+        if delete_file:
+            filepath.unlink()
+        else:
+            update_status(filepath, "cancelled")
     else:
-        continue_recording()
+        update_status(filepath, "completed")
 ```
 
 **Test Requirements:**

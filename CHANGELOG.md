@@ -5,6 +5,19 @@ All notable changes to Rejoice Slim v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- [R-008] Recording Control - Cancel
+  - Extended `start_recording_session` in `cli/commands.py` to treat `Ctrl+C` as an explicit cancel flow with confirmation.
+  - Implemented optional transcript deletion or safe cancellation by marking frontmatter status as `cancelled`, always cleaning up the audio stream.
+  - Added CLI unit coverage for the cancel path to ensure status updates behave as expected.
+
+### Changed
+
+- Transcription internals: `Transcriber` now tracks the effective language used/detected for the last transcription via a `last_language` property, preparing the ground for [T-002] language control and future frontmatter integration.
+
 ## [2.0.0] - 2025-12-17
 
 ### Added - Phase 0: Development Environment Setup

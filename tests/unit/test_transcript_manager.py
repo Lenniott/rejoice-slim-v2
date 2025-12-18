@@ -5,6 +5,7 @@ import re
 import tempfile
 
 from rejoice.transcript import manager
+from rejoice.transcript.manager import TranscriptMetadata
 
 
 def read_file(path: Path) -> str:
@@ -267,3 +268,19 @@ def test_update_status_is_atomic(tmp_path: Path, monkeypatch):
     manager.update_status(filepath, "completed")
 
     assert calls["used"] is True
+
+
+def test_generate_frontmatter_allows_custom_language():
+    """GIVEN transcript metadata with an explicit language
+    WHEN generate_frontmatter is called
+    THEN the language field reflects the provided value.
+    """
+    meta = TranscriptMetadata(
+        transcript_id="000123",
+        created=manager.datetime.now(),
+        status="recording",
+        language="en",
+    )
+
+    frontmatter = manager.generate_frontmatter(meta)
+    assert "language: en" in frontmatter

@@ -66,6 +66,9 @@ class Transcriber:
             )
 
         self._config = config
+        # Track the last language used/detected for [T-002] so that callers
+        # can persist it into transcript frontmatter if desired.
+        self._last_language: Optional[str] = None
 
         try:
             self._model = WhisperModel(
@@ -83,6 +86,16 @@ class Transcriber:
                     "installed."
                 ),
             ) from exc
+
+    @property
+    def last_language(self) -> Optional[str]:
+        """Return the last language used or detected during transcription.
+
+        For ``language='auto'`` this reflects the model-reported detected
+        language where available; otherwise it mirrors the configured
+        ``TranscriptionConfig.language`` value.
+        """
+        return self._last_language
 
     def transcribe_file(self, audio_path: str) -> Iterator[Dict[str, object]]:
         """Transcribe an audio file and yield normalised segment dictionaries.
@@ -116,7 +129,7 @@ class Transcriber:
             language_arg = self._config.language
 
         try:
-            segments, _info = self._model.transcribe(
+            segments, info = self._model.transcribe(
                 audio_path,
                 vad_filter=self._config.vad_filter,
                 language=language_arg,
@@ -130,6 +143,21 @@ class Transcriber:
                     "Verify that the audio file exists and is a supported format."
                 ),
             ) from exc
+
+        # Derive the effective language for this transcription run.
+        detected_language: Optional[str]
+        if language_arg is not None:
+            detected_language = language_arg
+        else:
+            # For auto-detection, faster-whisper exposes language information
+            # via the ``info`` object; support both attribute and mapping styles.
+            detected_language = None
+            if hasattr(info, "language"):
+                detected_language = getattr(info, "language")
+            elif isinstance(info, dict) and "language" in info:
+                detected_language = cast(Optional[str], info.get("language"))
+
+        self._last_language = detected_language
 
         # Normalise the third-party segment objects into simple dictionaries so
         # the rest of the codebase does not depend on faster-whisper's types.

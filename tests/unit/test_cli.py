@@ -5,7 +5,11 @@ from typing import List, Tuple
 import click
 from click.testing import CliRunner
 
-from rejoice.cli.commands import main, start_recording_session, _default_wait_for_stop
+from rejoice.cli.commands import (
+    main,
+    start_recording_session,
+    _default_wait_for_stop,
+)
 
 
 def test_cli_help():
@@ -214,3 +218,83 @@ def test_start_recording_marks_transcript_completed(monkeypatch, tmp_path):
 
     # And status is updated to completed at the end of the session
     assert ("update_status", transcript_path, "completed") in events
+
+
+def test_start_recording_handles_ctrl_c_and_marks_cancelled(monkeypatch, tmp_path):
+    """GIVEN a recording session
+    WHEN the user presses Ctrl+C during wait_for_stop
+    THEN the session is cancelled and transcript status is updated to 'cancelled'.
+    """
+    events: List[object] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000020.md"
+    transcript_path.write_text("initial content", encoding="utf-8")
+
+    def fake_create_transcript(save_dir: Path):
+        events.append("create_transcript")
+        return transcript_path, "000020"
+
+    class FakeStream:
+        def __init__(self) -> None:
+            self.stopped = False
+            self.closed = False
+
+        def stop(self) -> None:
+            self.stopped = True
+
+        def close(self) -> None:
+            self.closed = True
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        events.append("record_audio")
+        assert callable(callback)
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        events.append("wait_for_stop")
+        # Simulate Ctrl+C from user
+        raise KeyboardInterrupt()
+
+    # Patch confirmation prompt to simulate user choosing to keep the transcript
+    def fake_confirm_keep(*args, **kwargs):
+        # First prompt: cancel recording? -> yes
+        # Second prompt: delete file? -> no (keep, but mark cancelled)
+        events.append(("confirm", args, kwargs))
+        # For simplicity in this unit test we always return True on first call
+        # and False on second via a simple state flag.
+        state = fake_confirm_keep.__dict__.setdefault("state", {"count": 0})
+        state["count"] += 1
+        return state["count"] == 1
+
+    def fake_update_status(path: Path, status: str) -> None:
+        events.append(("update_status", path, status))
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        fake_update_status,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Confirm.ask",
+        fake_confirm_keep,
+    )
+
+    filepath, transcript_id = start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Core flow order still respected up to the interrupt
+    assert events[0:3] == ["create_transcript", "record_audio", "wait_for_stop"]
+
+    assert filepath == transcript_path
+    assert transcript_id == "000020"
+
+    # Status is updated to cancelled, not completed
+    assert ("update_status", transcript_path, "cancelled") in events

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.prompt import Confirm
 
 from rejoice import __version__
 from rejoice.audio import record_audio
@@ -24,11 +25,7 @@ def _default_wait_for_stop() -> None:
     ([R-007], [R-008]) build on this for richer control.
     """
     console.print("[bold]Press Enter to stop recording.[/bold]")
-    try:
-        click.getchar()
-    except (KeyboardInterrupt, EOFError):
-        # Treat interrupts as a normal stop signal for now.
-        pass
+    click.getchar()
 
 
 def start_recording_session(
@@ -72,9 +69,25 @@ def start_recording_session(
         channels=1,
     )
 
+    cancelled = False
+
     try:
         # 3. Wait for stop signal (keypress)
-        wait_for_stop()
+        try:
+            wait_for_stop()
+        except KeyboardInterrupt:
+            # Handle Ctrl+C as a cancel signal for [R-008].
+            cancelled = True
+            console.print(
+                "\n[bold red]Recording interrupt received (Ctrl+C).[/bold red]"
+            )
+
+            # First confirm whether the user really wants to cancel.
+            if not Confirm.ask(
+                "Cancel recording? This will stop without finalising as completed.",
+                default=True,
+            ):
+                cancelled = False
     finally:
         # 4. Clean up audio stream and display basic duration information
         try:
@@ -89,10 +102,36 @@ def start_recording_session(
         minutes, seconds = divmod(duration_seconds, 60)
         console.print(f"⏱️  Duration: {minutes:d}:{seconds:02d}")
 
-    # 5. Finalise the transcript frontmatter to reflect a completed recording.
-    update_status(filepath, "completed")
-    console.print("\n✅ Recording stopped. Transcript marked as [bold]completed[/bold].")
-    console.print(f"📄 File saved at: {filepath}")
+    if cancelled:
+        # Offer optional deletion, but default to keeping the file marked
+        # as cancelled to preserve data integrity.
+        delete_file = Confirm.ask(
+            "Delete the partial transcript file?",
+            default=False,
+        )
+        if delete_file:
+            try:
+                filepath.unlink()
+                console.print(
+                    "\n🗑️  Recording cancelled and transcript file deleted.",
+                )
+            except FileNotFoundError:  # pragma: no cover - defensive
+                console.print(
+                    "\n⚠️  Transcript file was already removed.",
+                )
+        else:
+            update_status(filepath, "cancelled")
+            console.print(
+                "\n⚠️  Recording cancelled. Transcript marked as "
+                "[bold]cancelled[/bold] and kept on disk.",
+            )
+    else:
+        # 5. Finalise the transcript frontmatter to reflect a completed recording.
+        update_status(filepath, "completed")
+        console.print(
+            "\n✅ Recording stopped. Transcript marked as [bold]completed[/bold].",
+        )
+        console.print(f"📄 File saved at: {filepath}")
 
     return filepath, transcript_id
 

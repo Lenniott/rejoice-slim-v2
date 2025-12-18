@@ -120,6 +120,61 @@ def test_transcribe_file_passes_none_language_when_auto(monkeypatch, tmp_path: P
     assert observed["language"] is None
 
 
+def test_transcriber_tracks_detected_language_when_auto(monkeypatch, tmp_path: Path):
+    """GIVEN language='auto' in config and model reports a detected language
+    WHEN transcribe_file is called
+    THEN the transcriber exposes the detected language via a property.
+    """
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
+            # Simulate faster-whisper returning an info object with language
+            class Info:
+                language = "es"
+
+            segments = [DummySegment("hola mundo", 0.0, 1.0)]
+            return segments, Info()
+
+    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+
+    cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
+    transcriber = transcription.Transcriber(cfg)
+
+    list(transcriber.transcribe_file(str(tmp_path / "audio.wav")))
+
+    assert transcriber.last_language == "es"
+
+
+def test_transcriber_last_language_matches_forced_language(monkeypatch, tmp_path: Path):
+    """GIVEN a fixed language in config
+    WHEN transcribe_file is called
+    THEN last_language matches the configured language regardless of model info.
+    """
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
+            class Info:
+                language = "fr"
+
+            segments = [DummySegment("bonjour", 0.0, 1.0)]
+            return segments, Info()
+
+    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+
+    cfg = TranscriptionConfig(model="tiny", language="en", vad_filter=True)
+    transcriber = transcription.Transcriber(cfg)
+
+    list(transcriber.transcribe_file(str(tmp_path / "audio.wav")))
+
+    assert transcriber.last_language == "en"
+
+
 def test_transcriber_raises_helpful_error_when_faster_whisper_missing(monkeypatch):
     """GIVEN faster-whisper cannot be imported
     WHEN Transcriber is constructed
