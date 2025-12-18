@@ -907,20 +907,20 @@ class AudioBuffer:
 ### [T-001] faster-whisper Integration
 **Priority:** Critical
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-002]
 
 **User Story:**
 As a user, I want accurate transcription so that my spoken words are converted to text correctly.
 
 **Acceptance Criteria:**
-- [ ] faster-whisper library integrated
-- [ ] Model downloading on first use
-- [ ] Model caching for subsequent uses
-- [ ] Support all model sizes (tiny, base, small, medium, large)
-- [ ] Configurable via config.yaml
-- [ ] Handle long audio without failure
-- [ ] VAD filter enabled by default
+- [x] faster-whisper library integrated
+- [x] Model downloading on first use
+- [x] Model caching for subsequent uses
+- [x] Support all model sizes (tiny, base, small, medium, large)
+- [x] Configurable via config.yaml
+- [x] Handle long audio without failure
+- [x] VAD filter enabled by default
 
 **Technical Notes:**
 ```python
