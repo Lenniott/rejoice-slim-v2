@@ -185,6 +185,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented `record_audio` helper in `rejoice.audio` using `sounddevice.InputStream` (16kHz mono, device-selectable)
   - Added unit tests for correct stream parameters, missing dependency handling, and wrapped sounddevice errors
   - Forms the basis for streaming audio into the recording pipeline in later stories
+ - [R-006] Recording Control - Start
+   - Implemented `start_recording_session` helper in `rejoice.cli.commands` to coordinate config loading, transcript creation, and audio capture
+   - Wired default `rec` invocation (no subcommand) to start a recording session immediately, printing transcript path and a simple duration summary
+   - Added CLI unit tests to verify that `rec` triggers a recording session and that transcript creation happens before audio capture, with clean stream shutdown
 
 ### Known Issues / Limitations
 

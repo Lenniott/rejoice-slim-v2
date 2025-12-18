@@ -29,7 +29,7 @@ These priority tiers sit **above phases**. When choosing what to work on next:
   - ✅ [I-001], ✅ [I-002], ✅ [I-003], ✅ [I-004]
   - ✅ [F-001], ✅ [F-002], ✅ [F-003], ✅ [F-004], ✅ [F-005], ✅ [F-006]
 - Core recording & transcripts:
-  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ❌ [R-006], ❌ [R-007], ❌ [R-008]
+  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ❌ [R-007], ❌ [R-008]
 - Core transcription:
   - ❌ [T-001], ❌ [T-002], ❌ [T-003]
 - Core user commands:
@@ -706,7 +706,7 @@ def normalize_id(user_input: str) -> str:
 ### [R-006] Recording Control - Start
 **Priority:** Critical
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-002, R-003]
 
 **User Story:**
