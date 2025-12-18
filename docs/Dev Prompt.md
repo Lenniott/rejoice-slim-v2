@@ -54,21 +54,29 @@ Look for:
 - ❌ **Not Started** - Available to work on
 - ⏸️ **Blocked** - Waiting on dependencies
 
-### Step 2: Pick Next Story
-**Find the next story to work on:**
+### Step 2: Pick Next Story (MVP → MMP → MLP)
+**Always use the Priority Tiers at the top of BACKLOG.md. Phases are secondary.**
 
-1. Look for stories with status ❌ (Not Started)
-2. Check dependencies are ✅ (Done)
-3. Start with earliest phase that has available stories
-4. Pick highest priority within that phase
+1. Open the **“🎯 Priority Tiers (MVP → MMP → MLP)”** section in `docs/BACKLOG.md`.
+2. In this order, look for stories with status ❌ (Not Started) or 🚧 (In Progress):
+   - First: **MVP** stories (Minimum Viable Product).
+   - Then: **MMP** stories (Minimum Marketable Product).
+   - Finally: remaining **MLP** stories (everything else).
+3. For candidate stories:
+   - Check dependencies are ✅ (Done) or clearly satisfied.
+   - Prefer finishing 🚧 stories before starting new ❌ ones.
+4. Only if there is a tie within the same tier:
+   - Use phases and per‑story `**Priority:**` (Critical/High/Medium/Low) to break the tie.
 
 **Example:**
 ```
-Phase 2: Core Recording System
-  [R-001] ✅ Done
-  [R-002] 🚧 In Progress  ← Continue this
-  [R-003] ❌ Not Started   ← Or start this if R-002 is done
-  [R-004] ❌ Not Started (Dependencies: R-002, R-003)
+Priority Tiers:
+  MVP: [I-004], [F-004], [F-005], [R-002], [R-003], [T-001], [T-003], [C-001], [C-003]
+
+Current status:
+  [R-002] ✅ Done
+  [R-003] ❌ Not Started   ← MVP + dependencies satisfied → start this
+  [C-001] ❌ Not Started   ← MVP but depends on transcripts existing
 ```
 
 ### Step 3: Read the Story Details

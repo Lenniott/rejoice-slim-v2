@@ -1,6 +1,6 @@
 # 🎙️ Rejoice v2 - Development Backlog
 
-**Last Updated:** December 17, 2024
+**Last Updated:** December 18, 2025
 **Status:** Ready for Development
 **Target:** v2.0.0 Release
 
@@ -9,9 +9,48 @@
 ## 📊 Progress Overview
 
 - **Total Stories:** 91
-- **Completed:** 9
+- **Completed:** 18
 - **In Progress:** 0
-- **Not Started:** 82
+- **Not Started:** 73
+
+---
+
+## 🎯 Priority Tiers (MVP → MMP → MLP)
+
+These priority tiers sit **above phases**. When choosing what to work on next:
+
+1. Always prefer **MVP** stories first.
+2. Then move on to **MMP** (Minimum Marketable Product).
+3. Treat all remaining stories as **MLP** (Minimum Lovable Product).
+
+**MVP (Minimum Viable Product) – Core end‑to‑end flow**
+
+- Phase 0 / 1 foundations:
+  - [I-001], [I-002], [I-003], [I-004]
+  - [F-001], [F-002], [F-003], [F-004], [F-005], [F-006]
+- Core recording & transcripts:
+  - [R-001], [R-002], [R-003], [R-004], [R-006], [R-007], [R-008]
+- Core transcription:
+  - [T-001], [T-002], [T-003]
+- Core user commands:
+  - [C-001], [C-003]
+
+**MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
+
+- Recording polish:
+  - [R-009], [R-010]
+- Transcription usability:
+  - [T-004], [T-005], [T-006]
+- CLI quality of life:
+  - [C-002], [C-004], [C-005]
+- Settings & setup:
+  - [S-001], [S-002], [S-004]
+- Basic AI assist:
+  - [AI-001], [AI-003], [AI-005]
+
+**MLP (Minimum Lovable Product) – Everything else**
+
+- All stories **not listed above** are implicitly treated as **MLP**.
 
 ---
 
@@ -548,20 +587,20 @@ def record_audio(callback, device=None):
 ### [R-003] Transcript Manager - Create File
 **Priority:** Critical
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [F-004]
 
 **User Story:**
 As a user, I want transcripts saved immediately when I start recording so that I never lose data even if the system crashes.
 
 **Acceptance Criteria:**
-- [ ] Create MD file with unique ID on record start
-- [ ] Generate next available ID (000001, 000002, etc.)
-- [ ] Add YAML frontmatter with metadata
-- [ ] File naming: `transcript_YYYYMMDD_ID.md`
-- [ ] Save to configured directory
-- [ ] Handle directory creation if needed
-- [ ] Atomic file creation (temp + rename)
+- [x] Create MD file with unique ID on record start
+- [x] Generate next available ID (000001, 000002, etc.)
+- [x] Add YAML frontmatter with metadata
+- [x] File naming: `transcript_YYYYMMDD_ID.md`
+- [x] Save to configured directory
+- [x] Handle directory creation if needed
+- [x] Atomic file creation (temp + rename)
 
 **Technical Notes:**
 ```python
@@ -2568,7 +2607,7 @@ if debug:
 ### [I-001] Virtual Environment Setup
 **Priority:** Critical
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [F-002]
 
 **User Story:**
@@ -2617,7 +2656,7 @@ pip install rejoice
 ### [I-002] Shell Alias Creation
 **Priority:** Critical
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [I-001]
 
 **User Story:**
@@ -2682,7 +2721,7 @@ source "$RC_FILE" 2>/dev/null || echo "Please run: source $RC_FILE"
 ### [I-003] Alias Activation & Path Resolution
 **Priority:** Critical
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [I-002]
 
 **User Story:**
@@ -2729,7 +2768,7 @@ alias rec="~/.rejoice/rec-wrapper.sh"
 ### [I-004] Installation Script (Full Integration)
 **Priority:** Critical
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [I-001, I-002, I-003]
 
 **User Story:**
@@ -2879,7 +2918,7 @@ echo ""
 ### [I-005] Uninstallation Script
 **Priority:** Medium
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [I-004]
 
 ---
@@ -2887,7 +2926,7 @@ echo ""
 ### [I-006] Uninstallation Script
 **Priority:** Medium
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [I-004]
 
 **User Story:**
