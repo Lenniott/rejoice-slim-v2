@@ -97,13 +97,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ConfigError` - Configuration-related errors
   - `TranscriptError` - Transcript file-related errors
   - `AIError` - AI enhancement-related errors
-- `src/rejoice/transcript/manager.py` - Transcript Manager implementation ([R-003]):
+- `src/rejoice/transcript/manager.py` - Transcript Manager implementation ([R-003], [R-004]):
   - `create_transcript` creates a new markdown transcript file with a unique, zero-padded 6-digit ID on record start
   - `get_next_id` scans the transcript directory to generate the next sequential ID across all dates
   - `generate_frontmatter` adds YAML frontmatter with id, created timestamp, status (`recording`), language, tags, and summary
   - `write_file_atomic` performs atomic file creation using a temp file and `os.replace` to guarantee whole-file writes
+  - `append_to_transcript` atomically appends new content to existing transcript files while preserving frontmatter and existing body
 - `tests/unit/test_transcript_manager.py` - Unit tests for transcript manager:
   - Tests ID generation, directory creation, filename pattern, frontmatter structure, duplicate ID handling, and atomic writes
+  - Tests atomic append behavior, frontmatter preservation, and newline handling for appended transcript content
 
 #### Testing Infrastructure
 - `tests/conftest.py` - Pytest configuration with:

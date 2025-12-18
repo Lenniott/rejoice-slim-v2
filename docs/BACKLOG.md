@@ -26,27 +26,27 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 **MVP (Minimum Viable Product) – Core end‑to‑end flow**
 
 - Phase 0 / 1 foundations:
-  - [I-001], [I-002], [I-003], [I-004]
-  - [F-001], [F-002], [F-003], [F-004], [F-005], [F-006]
+  - ✅ [I-001], ✅ [I-002], ✅ [I-003], ✅ [I-004]
+  - ✅ [F-001], ✅ [F-002], ✅ [F-003], ✅ [F-004], ✅ [F-005], ✅ [F-006]
 - Core recording & transcripts:
-  - [R-001], [R-002], [R-003], [R-004], [R-006], [R-007], [R-008]
+  - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ❌ [R-006], ❌ [R-007], ❌ [R-008]
 - Core transcription:
-  - [T-001], [T-002], [T-003]
+  - ❌ [T-001], ❌ [T-002], ❌ [T-003]
 - Core user commands:
-  - [C-001], [C-003]
+  - ❌ [C-001], ❌ [C-003]
 
 **MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
 
 - Recording polish:
-  - [R-009], [R-010]
+  - ❌ [R-009], ❌ [R-010]
 - Transcription usability:
-  - [T-004], [T-005], [T-006]
+  - ❌ [T-004], ❌ [T-005], ❌ [T-006]
 - CLI quality of life:
-  - [C-002], [C-004], [C-005]
+  - ❌ [C-002], ❌ [C-004], ❌ [C-005]
 - Settings & setup:
-  - [S-001], [S-002], [S-004]
+  - ❌ [S-001], ❌ [S-002], ❌ [S-004]
 - Basic AI assist:
-  - [AI-001], [AI-003], [AI-005]
+  - ❌ [AI-001], ❌ [AI-003], ❌ [AI-005]
 
 **MLP (Minimum Lovable Product) – Everything else**
 
@@ -632,7 +632,7 @@ def create_transcript(save_dir: Path) -> tuple[Path, str]:
 ### [R-004] Transcript Manager - Append Content
 **Priority:** Critical
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-003]
 
 **User Story:**

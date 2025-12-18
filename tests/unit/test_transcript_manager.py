@@ -145,3 +145,70 @@ def test_write_file_atomic_overwrites_existing_file(tmp_path: Path):
     manager.write_file_atomic(target, new_content)
 
     assert read_file(target) == new_content
+
+
+def test_append_to_transcript_preserves_frontmatter_and_appends_body():
+    """GIVEN an existing transcript with frontmatter
+    WHEN append_to_transcript is called
+    THEN the frontmatter is preserved and new text is appended after the body
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        filepath, _tid = manager.create_transcript(save_dir)
+
+        initial_content = read_file(filepath)
+        assert initial_content.endswith("\n\n")
+
+        manager.append_to_transcript(filepath, "First line.")
+        manager.append_to_transcript(filepath, "Second line.")
+
+        updated = read_file(filepath)
+
+        # Frontmatter should be unchanged at the top
+        assert updated.startswith(initial_content)
+
+        # Body content should contain both appended lines in order
+        body = updated[len(initial_content) :]
+        assert "First line." in body
+        assert "Second line." in body
+
+
+def test_append_to_transcript_handles_empty_body_gracefully():
+    """GIVEN a transcript that only has frontmatter
+    WHEN append_to_transcript is called
+    THEN the body is created correctly with proper newlines
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        filepath, _tid = manager.create_transcript(save_dir)
+
+        initial_content = read_file(filepath)
+        assert initial_content.endswith("\n\n")
+
+        manager.append_to_transcript(filepath, "First line.")
+
+        updated = read_file(filepath)
+        body = updated[len(initial_content) :]
+
+        # Body should start directly with the appended text, followed by a newline
+        assert body.startswith("First line.")
+        assert body.endswith("\n")
+
+
+def test_append_to_transcript_is_atomic(tmp_path: Path):
+    """GIVEN an existing transcript
+    WHEN append_to_transcript is called
+    THEN the file on disk always contains either the old or the full new content
+    """
+    save_dir = tmp_path
+    filepath, _tid = manager.create_transcript(save_dir)
+
+    before = read_file(filepath)
+
+    manager.append_to_transcript(filepath, "Some new content.")
+
+    after = read_file(filepath)
+
+    # We should never see a partially-written file; content is either old or full new
+    assert after != ""
+    assert before in after

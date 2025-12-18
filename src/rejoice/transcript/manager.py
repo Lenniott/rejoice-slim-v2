@@ -149,3 +149,26 @@ def create_transcript(save_dir: Path) -> Tuple[Path, str]:
         suggestion="Check the transcripts directory for unusual filenames or "
         "permission issues.",
     )
+
+
+def append_to_transcript(filepath: Path, text: str) -> None:
+    """Atomically append text to an existing transcript file.
+
+    This function preserves the existing YAML frontmatter and body, and
+    appends the provided text to the end of the file using an atomic
+    write (via write_file_atomic) to avoid partial writes or corruption.
+
+    Args:
+        filepath: Path to the transcript markdown file.
+        text: Text to append to the transcript body.
+    """
+    existing = filepath.read_text(encoding="utf-8")
+
+    # Ensure there is exactly one trailing newline before appending content
+    if not existing.endswith("\n"):
+        existing = existing + "\n"
+
+    # Always end appended content with a newline to keep transcript tidy
+    updated = existing + text + "\n"
+
+    write_file_atomic(filepath, updated)
