@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import pytest
 
@@ -167,3 +167,58 @@ def test_transcribe_file_wraps_lower_level_errors(monkeypatch, tmp_path: Path):
     message = str(excinfo.value).lower()
     assert "transcription failed" in message
     assert "boom" in message
+
+
+def test_stream_file_to_transcript_appends_each_segment_in_order(
+    monkeypatch, tmp_path: Path
+):
+    """GIVEN an audio file and transcript path
+    WHEN stream_file_to_transcript is called
+    THEN each non-empty segment is appended to the transcript in order.
+    """
+
+    calls: List[Dict[str, object]] = []
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
+            # Two real segments and one empty/whitespace-only segment that
+            # should be ignored for appends.
+            segments = [
+                DummySegment("first segment", 0.0, 1.0),
+                DummySegment("   ", 1.0, 2.0),
+                DummySegment("second segment", 2.0, 3.0),
+            ]
+            info = {"duration": 3.0}
+            return segments, info
+
+    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+
+    def fake_append(transcript_path: Path, text: str) -> None:
+        calls.append({"path": transcript_path, "text": text})
+
+    monkeypatch.setattr(transcription, "append_to_transcript", fake_append)
+
+    cfg = TranscriptionConfig(model="tiny", language="en", vad_filter=True)
+    transcriber = transcription.Transcriber(cfg)
+
+    audio_path = str(tmp_path / "audio.wav")
+    transcript_path = tmp_path / "transcript.md"
+
+    # Consume the streaming generator to trigger appends.
+    segments = list(transcriber.stream_file_to_transcript(audio_path, transcript_path))
+
+    # We should have yielded all three segments, including the blank one.
+    assert len(segments) == 3
+    assert segments[0]["text"] == "first segment"
+    assert segments[1]["text"] == ""
+    assert segments[2]["text"] == "second segment"
+
+    # Only the non-empty segments should have resulted in append operations.
+    assert len(calls) == 2
+    assert calls[0]["path"] is transcript_path
+    assert calls[0]["text"] == "first segment"
+    assert calls[1]["path"] is transcript_path
+    assert calls[1]["text"] == "second segment"

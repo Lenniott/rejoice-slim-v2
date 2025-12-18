@@ -994,18 +994,18 @@ def transcribe_with_language(audio, language='auto'):
 ### [T-003] Streaming Transcription to File
 **Priority:** Critical
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [T-001, R-004]
 
 **User Story:**
 As a user, I want transcription to be saved continuously so that I never lose partial work if something crashes.
 
 **Acceptance Criteria:**
-- [ ] Transcribe audio in segments
-- [ ] Append each segment to file immediately
-- [ ] No buffering - write as soon as transcribed
-- [ ] Handle streaming gracefully
-- [ ] Coordinate with audio capture
+- [x] Transcribe audio in segments
+- [x] Append each segment to file immediately
+- [x] No buffering - write as soon as transcribed
+- [x] Handle streaming gracefully
+- [x] Coordinate with audio capture
 
 **Technical Notes:**
 ```python

@@ -185,19 +185,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented `record_audio` helper in `rejoice.audio` using `sounddevice.InputStream` (16kHz mono, device-selectable)
   - Added unit tests for correct stream parameters, missing dependency handling, and wrapped sounddevice errors
   - Forms the basis for streaming audio into the recording pipeline in later stories
- - [T-001] faster-whisper Integration
+- [T-001] faster-whisper Integration
   - Implemented `Transcriber` in `rejoice.transcription` wrapping the `faster-whisper` `WhisperModel`
   - Added configuration-driven model selection via `TranscriptionConfig` (tiny/base/small/medium/large)
   - Normalised transcription output to simple `{text, start, end}` dictionaries and enabled VAD by default
   - Introduced 5 unit tests covering model initialisation, VAD and language wiring (including `language='auto'`), missing dependency handling, and error wrapping for underlying model failures
- - [R-006] Recording Control - Start
-   - Implemented `start_recording_session` helper in `rejoice.cli.commands` to coordinate config loading, transcript creation, and audio capture
-   - Wired default `rec` invocation (no subcommand) to start a recording session immediately, printing transcript path and a simple duration summary
-   - Added CLI unit tests to verify that `rec` triggers a recording session and that transcript creation happens before audio capture, with clean stream shutdown
- - [R-007] Recording Control - Stop
-   - Extended `start_recording_session` to finalise recordings by updating transcript frontmatter status to `completed` and printing a clear success message with file location
-   - Implemented `update_status` helper in `rejoice.transcript.manager` to atomically update YAML frontmatter while preserving body content
-   - Added unit tests covering CLI stop behaviour, default keypress handling for Enter, and frontmatter status updates performed via atomic writes
+- [T-003] Streaming Transcription to File
+  - Extended `Transcriber` with `stream_file_to_transcript` to stream segments from an audio file directly into a markdown transcript
+  - Each non-empty segment is appended atomically via `append_to_transcript`, ensuring partial results are always persisted
+  - Added a unit test verifying that segments are yielded in order and only non-empty segments trigger append operations
+- [R-006] Recording Control - Start
+  - Implemented `start_recording_session` helper in `rejoice.cli.commands` to coordinate config loading, transcript creation, and audio capture
+  - Wired default `rec` invocation (no subcommand) to start a recording session immediately, printing transcript path and a simple duration summary
+  - Added CLI unit tests to verify that `rec` triggers a recording session and that transcript creation happens before audio capture, with clean stream shutdown
+- [R-007] Recording Control - Stop
+  - Extended `start_recording_session` to finalise recordings by updating transcript frontmatter status to `completed` and printing a clear success message with file location
+  - Implemented `update_status` helper in `rejoice.transcript.manager` to atomically update YAML frontmatter while preserving body content
+  - Added unit tests covering CLI stop behaviour, default keypress handling for Enter, and frontmatter status updates performed via atomic writes
 
 ### Known Issues / Limitations
 

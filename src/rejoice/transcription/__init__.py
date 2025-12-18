@@ -11,8 +11,10 @@ single ``transcribe_file`` method that yields normalised segments.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Iterable, Iterator, Optional
+from pathlib import Path
+from typing import Dict, Iterable, Iterator, Optional, cast
 
+from rejoice.transcript.manager import append_to_transcript
 from rejoice.core.config import TranscriptionConfig
 from rejoice.exceptions import TranscriptionError
 
@@ -137,6 +139,34 @@ class Transcriber:
                 "start": float(getattr(seg, "start", 0.0)),
                 "end": float(getattr(seg, "end", 0.0)),
             }
+
+    def stream_file_to_transcript(
+        self, audio_path: str, transcript_path: Path
+    ) -> Iterator[Dict[str, object]]:
+        """Transcribe ``audio_path`` and append segments to ``transcript_path``.
+
+        This method implements the core of [T-003] \"Streaming Transcription to
+        File\" by combining :meth:`transcribe_file` with the transcript manager's
+        :func:`append_to_transcript` helper.
+
+        Each segment yielded by :meth:`transcribe_file` is:
+
+        - yielded to the caller as a normalised dictionary; and
+        - immediately appended to ``transcript_path`` if it contains non-empty
+          text.
+
+        The actual file write is performed atomically by
+        :func:`append_to_transcript`, preserving the zero data loss guarantee.
+        """
+
+        for segment in self.transcribe_file(audio_path):
+            # ``transcribe_file`` guarantees that ``text`` is a string value, but
+            # we still cast here so static type checkers understand that the
+            # value passed into ``append_to_transcript`` is always ``str``.
+            text = cast(str, segment.get("text", "") or "")
+            if text.strip():
+                append_to_transcript(transcript_path, text)
+            yield segment
 
 
 def _normalise_iterable(segments: Iterable[object]) -> Iterable[object]:
