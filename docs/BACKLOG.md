@@ -975,7 +975,7 @@ class Transcriber:
 ### [T-002] Language Detection & Control
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [T-001]
 
 **User Story:**

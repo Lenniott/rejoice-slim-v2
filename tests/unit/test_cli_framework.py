@@ -36,6 +36,15 @@ def test_debug_flag_global():
     # Debug flag should be accepted globally
 
 
+def test_language_flag_global():
+    """GIVEN --language flag
+    WHEN main is invoked
+    THEN the flag is accepted globally."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["--language", "en", "--help"])
+    assert result.exit_code == 0
+
+
 def test_config_subcommand_exists():
     """GIVEN rec command
     WHEN config subcommand is called

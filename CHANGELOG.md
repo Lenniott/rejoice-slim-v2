@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Transcription internals: `Transcriber` now tracks the effective language used/detected for the last transcription via a `last_language` property, preparing the ground for [T-002] language control and future frontmatter integration.
+- [T-002] Language Detection & Control
+  - Extended `Transcriber` so that `language='auto'` passes `None` through to faster-whisper, records the model-reported language, and exposes it via a `last_language` property.
+  - Updated `stream_file_to_transcript` to persist the effective language into transcript YAML frontmatter via a new atomic `update_language` helper in the transcript manager.
+  - Added a global `--language / -l` CLI flag to accept per-invocation language overrides (plumbed into Click context for future transcription commands) and expanded unit coverage around language handling.
 
 ## [2.0.0] - 2025-12-17
 

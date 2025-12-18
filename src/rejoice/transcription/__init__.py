@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, Optional, cast
 
-from rejoice.transcript.manager import append_to_transcript
+from rejoice.transcript.manager import append_to_transcript, update_language
 from rejoice.core.config import TranscriptionConfig
 from rejoice.exceptions import TranscriptionError
 
@@ -195,6 +195,13 @@ class Transcriber:
             if text.strip():
                 append_to_transcript(transcript_path, text)
             yield segment
+
+        # After streaming has completed, persist the effective language into the
+        # transcript frontmatter for [T-002]. Prefer the detected language when
+        # auto-detection was used, otherwise fall back to the configured value.
+        effective_language = self._last_language or self._config.language
+        if effective_language is not None:
+            update_language(transcript_path, effective_language)
 
 
 def _normalise_iterable(segments: Iterable[object]) -> Iterable[object]:

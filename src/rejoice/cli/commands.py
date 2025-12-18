@@ -139,8 +139,14 @@ def start_recording_session(
 @click.group(invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Show version and exit")
 @click.option("--debug", is_flag=True, help="Enable debug mode")
+@click.option(
+    "--language",
+    "-l",
+    metavar="CODE",
+    help="Force transcription language (e.g. en, es, fr).",
+)
 @click.pass_context
-def main(ctx, version, debug):
+def main(ctx, version, debug, language):
     """Rejoice - Local voice transcription tool.
 
     Run 'rec' to start recording.
@@ -156,9 +162,10 @@ def main(ctx, version, debug):
     if debug:
         console.print("[yellow]Debug mode enabled[/yellow]")
 
-    # Store debug flag in context for subcommands
+    # Store debug flag and language override in context for subcommands
     ctx.ensure_object(dict)
     ctx.obj["debug"] = debug
+    ctx.obj["language"] = language
 
     # If no subcommand, start a recording session
     if ctx.invoked_subcommand is None:

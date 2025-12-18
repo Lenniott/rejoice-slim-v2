@@ -10,6 +10,7 @@ import pytest
 from rejoice.core.config import TranscriptionConfig
 from rejoice.exceptions import TranscriptionError
 import rejoice.transcription as transcription
+from rejoice.transcript import manager as transcript_manager
 
 
 class DummySegment:
@@ -260,7 +261,7 @@ def test_stream_file_to_transcript_appends_each_segment_in_order(
     transcriber = transcription.Transcriber(cfg)
 
     audio_path = str(tmp_path / "audio.wav")
-    transcript_path = tmp_path / "transcript.md"
+    transcript_path, _tid = transcript_manager.create_transcript(tmp_path)
 
     # Consume the streaming generator to trigger appends.
     segments = list(transcriber.stream_file_to_transcript(audio_path, transcript_path))
@@ -277,3 +278,40 @@ def test_stream_file_to_transcript_appends_each_segment_in_order(
     assert calls[0]["text"] == "first segment"
     assert calls[1]["path"] is transcript_path
     assert calls[1]["text"] == "second segment"
+
+
+def test_stream_file_to_transcript_updates_language_in_frontmatter(
+    monkeypatch, tmp_path: Path
+):
+    """GIVEN language='auto' and a model that reports a detected language
+    WHEN stream_file_to_transcript completes
+    THEN the transcript frontmatter language field is updated accordingly.
+    """
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
+            class Info:
+                language = "es"
+
+            segments = [DummySegment("hola mundo", 0.0, 1.0)]
+            return segments, Info()
+
+    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+
+    cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
+    transcriber = transcription.Transcriber(cfg)
+
+    # Create a real transcript file so that frontmatter helpers operate normally.
+    save_dir = tmp_path
+    transcript_path, _tid = transcript_manager.create_transcript(save_dir)
+
+    audio_path = str(tmp_path / "audio.wav")
+
+    # Consume the generator to completion to trigger the post-processing hook.
+    list(transcriber.stream_file_to_transcript(audio_path, transcript_path))
+
+    content = transcript_path.read_text(encoding="utf-8")
+    assert "language: es" in content
