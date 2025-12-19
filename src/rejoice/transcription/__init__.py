@@ -214,3 +214,7 @@ def _normalise_iterable(segments: Iterable[object]) -> Iterable[object]:
 
 
 __all__ = ["Transcriber", "WhisperModel"]
+
+# Import real-time transcription components
+# Note: RealtimeTranscriptionWorker is imported directly in commands.py
+# and doesn't need to be exported from here since it's an internal implementation detail

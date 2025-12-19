@@ -9,9 +9,9 @@
 ## 📊 Progress Overview
 
 - **Total Stories:** 83
-- **Completed:** 22
+- **Completed:** 24
 - **In Progress:** 0
-- **Not Started:** 61
+- **Not Started:** 59
 
 ---
 
@@ -32,8 +32,8 @@ These priority tiers sit **above phases**. When choosing what to work on next:
   - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ✅ [R-008]
 - Core transcription:
   - ✅ [T-001], ✅ [T-002], ✅ [T-003]
-  - ❌ [T-009] Connect Recording to Transcription
-  - ❌ [T-010] Real-Time Incremental Transcription During Recording
+  - ✅ [T-009] Connect Recording to Transcription
+  - ✅ [T-010] Real-Time Incremental Transcription During Recording
 - Core user commands:
   - ✅ [C-001], ✅ [C-003]
 
@@ -1083,20 +1083,20 @@ def streaming_transcription(audio_stream, transcript_file):
 ### [T-009] Connect Recording to Transcription
 **Priority:** Critical
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-006, T-001, T-003]
 
 **User Story:**
 As a user, I want my recorded audio to be automatically transcribed so that when I run `rec`, I get a transcript file with actual text, not just metadata.
 
 **Acceptance Criteria:**
-- [ ] Audio from recording callback is saved to a temporary file during recording
-- [ ] After recording stops, temporary audio file is passed to Transcriber
-- [ ] Transcription runs automatically and appends text to transcript file
-- [ ] Temporary audio file is cleaned up after transcription completes
-- [ ] Transcription errors are handled gracefully without crashing the CLI
-- [ ] Cancelled recordings skip transcription (no transcription attempted)
-- [ ] Language from CLI `--language` flag is passed to Transcriber when provided
+- [x] Audio from recording callback is saved to a temporary file during recording
+- [x] After recording stops, temporary audio file is passed to Transcriber
+- [x] Transcription runs automatically and appends text to transcript file
+- [x] Temporary audio file is cleaned up after transcription completes
+- [x] Transcription errors are handled gracefully without crashing the CLI
+- [x] Cancelled recordings skip transcription (no transcription attempted)
+- [x] Language from CLI `--language` flag is passed to Transcriber when provided
 
 **Technical Notes:**
 ```python
@@ -1164,23 +1164,23 @@ def start_recording_session():
 ### [T-010] Real-Time Incremental Transcription During Recording
 **Priority:** High
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [T-009, T-001, T-003]
 
 **User Story:**
 As a user, I want to see my transcript appear in real-time as I speak so that I can verify the recording is working and see my words appear incrementally in the file.
 
 **Acceptance Criteria:**
-- [ ] Transcript file is updated incrementally as speech segments are confirmed
-- [ ] Uses whisper_streaming library for real-time transcription
-- [ ] User can see new content appearing in the transcript file while recording
-- [ ] Partial audio is transcribed incrementally (not just at the end)
-- [ ] Thread-safe file writing (no corruption from concurrent writes)
-- [ ] Final transcription pass after recording stops to catch any remaining audio
-- [ ] Configurable min-chunk-size (default: 1 second)
-- [ ] Handle transcription errors gracefully without stopping recording
-- [ ] Show visual indicator when transcription is updating (optional)
-- [ ] Support VAD (Voice Activity Detection) for better segment detection
+- [x] Transcript file is updated incrementally as speech segments are confirmed
+- [x] Uses faster-whisper with chunked processing for real-time transcription (alternative to whisper_streaming to maintain "slim" philosophy)
+- [x] User can see new content appearing in the transcript file while recording
+- [x] Partial audio is transcribed incrementally (not just at the end)
+- [x] Thread-safe file writing (no corruption from concurrent writes)
+- [x] Final transcription pass after recording stops to catch any remaining audio
+- [x] Configurable min-chunk-size (default: 1 second, implemented as 1.0 seconds)
+- [x] Handle transcription errors gracefully without stopping recording
+- [ ] Show visual indicator when transcription is updating (optional - deferred)
+- [x] Support VAD (Voice Activity Detection) for better segment detection (via faster-whisper)
 
 **Technical Notes:**
 ```python

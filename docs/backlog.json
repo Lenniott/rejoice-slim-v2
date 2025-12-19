@@ -1,0 +1,2596 @@
+{
+  "project": {
+    "name": "Rejoice Slim v2",
+    "phases": [
+      "Phase 0: Installation & Environment",
+      "Phase 1: Foundation & Project Setup",
+      "Phase 2: Core Recording System",
+      "Phase 3: Transcription System",
+      "Phase 4: Advanced Transcription",
+      "Phase 5: AI Enhancement",
+      "Phase 6: User Commands",
+      "Phase 7: Configuration & Settings",
+      "Phase 8: Polish & Release"
+    ]
+  },
+  "items": [
+    {
+      "id": "I-001",
+      "code": "I-001",
+      "phaseId": "0",
+      "title": "Installation Script",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want one-command installation so that setup is effortless.",
+      "acceptanceCriteria": [
+        {
+          "text": "`curl | bash` installer works"
+        },
+        {
+          "text": "Creates virtual environment"
+        },
+        {
+          "text": "Installs dependencies"
+        },
+        {
+          "text": "Sets up config directory"
+        },
+        {
+          "text": "Creates `rec` command alias"
+        },
+        {
+          "text": "Tests installation"
+        },
+        {
+          "text": "Works on macOS and Linux"
+        }
+      ],
+      "technicalNotes": "```bash\n#!/bin/bash\n# install.sh\n\n# Detect OS\nOS=\"$(uname -s)\"\n\n# Install system dependencies\nif [ \"$OS\" = \"Darwin\" ]; then\n    brew install portaudio ffmpeg\nelif [ \"$OS\" = \"Linux\" ]; then\n    sudo apt-get install portaudio19-dev ffmpeg\nfi\n\n# Create venv\npython3 -m venv ~/.rejoice/venv\n\n# Install package\n~/.rejoice/venv/bin/pip install rejoice\n\n# Create alias\necho 'alias rec=\"~/.rejoice/venv/bin/rec\"' >> ~/.bashrc\n```",
+      "testRequirements": "- Test on fresh macOS\n- Test on fresh Linux (Ubuntu, Debian)\n- Test with different shells (bash, zsh)\n- Test venv isolation"
+    },
+    {
+      "id": "I-002",
+      "code": "I-002",
+      "phaseId": "0",
+      "title": "Development Environment Setup",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a developer, I want a reproducible development environment so that all contributors have the same setup.",
+      "acceptanceCriteria": [
+        {
+          "text": "README.md with dev setup instructions"
+        },
+        {
+          "text": "Requirements files (pyproject.toml with dev dependencies)"
+        },
+        {
+          "text": "Virtual environment instructions"
+        },
+        {
+          "text": "Pre-commit hooks configured"
+        },
+        {
+          "text": "IDE settings (VSCode recommended settings) - Optional"
+        },
+        {
+          "text": "Environment variables documented (.env.example)"
+        }
+      ],
+      "technicalNotes": "```bash\n# Development setup\ngit clone https://github.com/user/rejoice-v2.git\ncd rejoice-v2\npython3 -m venv venv\nsource venv/bin/activate\npip install -e \".[dev]\"\npre-commit install\n```",
+      "testRequirements": "- Test on fresh clone\n- Verify all dev tools work\n- Test pre-commit hooks"
+    },
+    {
+      "id": "I-003",
+      "code": "I-003",
+      "phaseId": "0",
+      "title": "Uninstallation Script",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want clean uninstallation so that Rejoice doesn't leave system pollution.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec uninstall` removes everything"
+        },
+        {
+          "text": "Remove virtual environment"
+        },
+        {
+          "text": "Remove config directory (with confirmation)"
+        },
+        {
+          "text": "Remove command aliases"
+        },
+        {
+          "text": "Optionally keep transcripts"
+        },
+        {
+          "text": "Confirmation prompts"
+        }
+      ],
+      "technicalNotes": "```bash\n#!/bin/bash\n# Included in package\n\necho \"This will remove Rejoice from your system.\"\necho \"Your transcripts will NOT be deleted.\"\nread -p \"Continue? (y/n) \" -n 1 -r\n\nif [[ $REPLY =~ ^[Yy]$ ]]; then\n    rm -rf ~/.rejoice\n    # Remove alias from shell rc\nfi\n```",
+      "testRequirements": "- Test complete removal\n- Test transcript preservation\n- Test on different systems"
+    },
+    {
+      "id": "F-001",
+      "code": "F-001",
+      "phaseId": "1",
+      "title": "Project Structure Setup",
+      "priority": "Critical",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a developer, I want a well-organized project structure so that the codebase is easy to navigate and maintain.",
+      "acceptanceCriteria": [
+        {
+          "text": "Directory structure follows Python best practices"
+        },
+        {
+          "text": "`src/` for source code"
+        },
+        {
+          "text": "`tests/` with unit/integration/e2e subdirectories"
+        },
+        {
+          "text": "`docs/` for documentation"
+        },
+        {
+          "text": "`scripts/` for installation/setup scripts"
+        },
+        {
+          "text": "`.github/workflows/` for CI/CD"
+        },
+        {
+          "text": "Root level: README, LICENSE, pyproject.toml"
+        }
+      ],
+      "technicalNotes": "```\nrejoice-v2/\n├── src/\n│   └── rejoice/\n│       ├── __init__.py\n│       ├── cli/\n│       ├── core/\n│       ├── transcription/\n│       ├── ai/\n│       └── utils/\n├── tests/\n│   ├── unit/\n│   ├── integration/\n│   ├── e2e/\n│   └── fixtures/\n├── docs/\n├── scripts/\n└── pyproject.toml\n```",
+      "testRequirements": "- N/A (setup task)"
+    },
+    {
+      "id": "F-002",
+      "code": "F-002",
+      "phaseId": "1",
+      "title": "Python Package Configuration",
+      "priority": "Critical",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a developer, I want proper package configuration so that installation and dependency management is straightforward.",
+      "acceptanceCriteria": [
+        {
+          "text": "`pyproject.toml` configured with Poetry or setuptools"
+        },
+        {
+          "text": "Project metadata defined (name, version, authors)"
+        },
+        {
+          "text": "Dependencies specified with version constraints"
+        },
+        {
+          "text": "Dev dependencies separated"
+        },
+        {
+          "text": "Entry points defined for `rec` command"
+        },
+        {
+          "text": "Python version requirement (>= 3.8)"
+        }
+      ],
+      "technicalNotes": "```toml\n[tool.poetry]\nname = \"rejoice\"\nversion = \"2.0.0\"\ndescription = \"Local-first voice transcription\"\n\n[tool.poetry.scripts]\nrec = \"rejoice.cli:main\"\n```",
+      "testRequirements": "- Test that `rec` command is available after install\n- Test in fresh virtual environment"
+    },
+    {
+      "id": "F-003",
+      "code": "F-003",
+      "phaseId": "1",
+      "title": "Testing Framework Setup",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a developer, I want a comprehensive testing framework so that I can practice TDD and maintain high code quality.",
+      "acceptanceCriteria": [
+        {
+          "text": "pytest configured"
+        },
+        {
+          "text": "pytest-cov for coverage reports"
+        },
+        {
+          "text": "pytest-asyncio for async tests"
+        },
+        {
+          "text": "Test fixtures structure created"
+        },
+        {
+          "text": "Sample test files for each test type"
+        },
+        {
+          "text": "Coverage reporting configured (90% target)"
+        },
+        {
+          "text": "Pre-commit hooks for running tests"
+        }
+      ],
+      "technicalNotes": "```python\n# pytest.ini\n[pytest]\ntestpaths = tests\npython_files = test_*.py\npython_classes = Test*\npython_functions = test_*\naddopts = -v --cov=src --cov-report=html --cov-report=term\n```",
+      "testRequirements": "- Create sample passing test to verify setup\n- Test coverage report generation"
+    },
+    {
+      "id": "F-004",
+      "code": "F-004",
+      "phaseId": "1",
+      "title": "Configuration System Design",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want a flexible configuration system so that I can customize Rejoice to my preferences without editing code.",
+      "acceptanceCriteria": [
+        {
+          "text": "`config.yaml` format designed"
+        },
+        {
+          "text": "`.env` support for sensitive values"
+        },
+        {
+          "text": "Config validation with schema"
+        },
+        {
+          "text": "Default configuration included"
+        },
+        {
+          "text": "User config overrides defaults"
+        },
+        {
+          "text": "Config location: `~/.config/rejoice/config.yaml`"
+        },
+        {
+          "text": "`rec config` commands work"
+        }
+      ],
+      "technicalNotes": "```yaml\n# config.yaml structure\ntranscription:\n  model: medium\n  language: auto\n  vad_filter: true\n\noutput:\n  save_path: ~/Documents/transcripts\n  template: default\n  auto_analyze: true\n  auto_copy: true\n\naudio:\n  device: default\n  sample_rate: 16000\n\nai:\n  ollama_url: http://localhost:11434\n  model: llama2\n  prompts_path: ~/.config/rejoice/prompts/\n```",
+      "testRequirements": "- Unit tests for config loading\n- Test default config\n- Test config validation\n- Test config merging (defaults + user overrides)"
+    },
+    {
+      "id": "F-005",
+      "code": "F-005",
+      "phaseId": "1",
+      "title": "CLI Framework Setup",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want intuitive CLI commands so that I can interact with Rejoice naturally.",
+      "acceptanceCriteria": [
+        {
+          "text": "Click or Typer framework configured"
+        },
+        {
+          "text": "Main `rec` command works"
+        },
+        {
+          "text": "Subcommands structure established"
+        },
+        {
+          "text": "`--help` provides clear information"
+        },
+        {
+          "text": "`--version` shows version"
+        },
+        {
+          "text": "`--debug` flag available globally"
+        },
+        {
+          "text": "Color output with rich library"
+        }
+      ],
+      "technicalNotes": "```python\nimport typer\nfrom rich.console import Console\n\napp = typer.Typer()\nconsole = Console()\n\n@app.command()\ndef record():\n    \"\"\"Start recording\"\"\"\n    pass\n\n@app.command()\ndef list():\n    \"\"\"List all recordings\"\"\"\n    pass\n```",
+      "testRequirements": "- Test command registration\n- Test help output\n- Test version output\n- Test debug flag"
+    },
+    {
+      "id": "F-006",
+      "code": "F-006",
+      "phaseId": "1",
+      "title": "Logging System",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user/developer, I want clear logging so that I can troubleshoot issues and understand what's happening.",
+      "acceptanceCriteria": [
+        {
+          "text": "Structured logging with Python logging module"
+        },
+        {
+          "text": "Different log levels (DEBUG, INFO, WARNING, ERROR)"
+        },
+        {
+          "text": "Log to file: `~/.config/rejoice/logs/rejoice.log`"
+        },
+        {
+          "text": "Console output respects `--debug` flag"
+        },
+        {
+          "text": "Log rotation configured (max 10MB, 5 files)"
+        },
+        {
+          "text": "Pretty formatting for terminal output"
+        }
+      ],
+      "technicalNotes": "```python\nimport logging\nfrom rich.logging import RichHandler\n\nlogging.basicConfig(\n    level=logging.INFO,\n    format=\"%(message)s\",\n    handlers=[\n        RichHandler(rich_tracebacks=True),\n        logging.FileHandler(\"~/.config/rejoice/logs/rejoice.log\")\n    ]\n)\n```",
+      "testRequirements": "- Test log file creation\n- Test different log levels\n- Test debug mode enables verbose output"
+    },
+    {
+      "id": "R-001",
+      "code": "R-001",
+      "phaseId": "2",
+      "title": "Audio Device Detection",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want Rejoice to detect my microphone automatically so that I don't have to configure anything manually.",
+      "acceptanceCriteria": [
+        {
+          "text": "Detect available audio input devices"
+        },
+        {
+          "text": "Handle no devices gracefully"
+        },
+        {
+          "text": "Show device list with `rec config list-mics`"
+        },
+        {
+          "text": "Default to system default device"
+        },
+        {
+          "text": "Support device selection by index or name"
+        },
+        {
+          "text": "Test concurrent access (Zoom + Rejoice)"
+        }
+      ],
+      "technicalNotes": "```python\nimport sounddevice as sd\n\ndef get_audio_devices():\n    devices = sd.query_devices()\n    input_devices = [d for d in devices if d['max_input_channels'] > 0]\n    return input_devices\n```",
+      "testRequirements": "- Unit test device detection\n- Integration test with mock audio device\n- Test device selection"
+    },
+    {
+      "id": "R-002",
+      "code": "R-002",
+      "phaseId": "2",
+      "title": "Audio Capture Implementation",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to record audio from my microphone so that I can capture spoken content.",
+      "acceptanceCriteria": [
+        {
+          "text": "Capture audio using sounddevice"
+        },
+        {
+          "text": "Sample rate: 16kHz (Whisper requirement)"
+        },
+        {
+          "text": "Mono channel"
+        },
+        {
+          "text": "Real-time streaming to buffer"
+        },
+        {
+          "text": "Handle audio device errors"
+        },
+        {
+          "text": "Work concurrently with other apps"
+        },
+        {
+          "text": "Clean start/stop without clicks"
+        }
+      ],
+      "technicalNotes": "```python\nimport sounddevice as sd\nimport numpy as np\n\ndef record_audio(callback, device=None):\n    stream = sd.InputStream(\n        samplerate=16000,\n        channels=1,\n        callback=callback,\n        device=device\n    )\n    stream.start()\n    return stream\n```",
+      "testRequirements": "- Unit test with mock audio\n- Integration test with real device\n- Test concurrent access\n- Test error handling (device busy, disconnected)"
+    },
+    {
+      "id": "R-003",
+      "code": "R-003",
+      "phaseId": "2",
+      "title": "Transcript Manager - Create File",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want transcripts saved immediately when I start recording so that I never lose data even if the system crashes.",
+      "acceptanceCriteria": [
+        {
+          "text": "Create MD file with unique ID on record start"
+        },
+        {
+          "text": "Generate next available ID (000001, 000002, etc.)"
+        },
+        {
+          "text": "Add YAML frontmatter with metadata"
+        },
+        {
+          "text": "File naming: `transcript_YYYYMMDD_ID.md`"
+        },
+        {
+          "text": "Save to configured directory"
+        },
+        {
+          "text": "Handle directory creation if needed"
+        },
+        {
+          "text": "Atomic file creation (temp + rename)"
+        }
+      ],
+      "technicalNotes": "```python\ndef create_transcript(save_dir: Path) -> tuple[Path, str]:\n    \"\"\"Create new transcript file immediately\"\"\"\n    transcript_id = get_next_id(save_dir)\n    date_str = datetime.now().strftime(\"%Y%m%d\")\n    filename = f\"{transcript_id}_transcript_{date_str}.md\"\n\n    frontmatter = generate_frontmatter(transcript_id)\n    filepath = save_dir / filename\n\n    # Atomic write\n    write_file_atomic(filepath, frontmatter)\n\n    return filepath, transcript_id\n```",
+      "testRequirements": "- Test ID generation\n- Test file creation\n- Test frontmatter format\n- Test atomic write\n- Test directory creation\n- Test duplicate ID handling"
+    },
+    {
+      "id": "R-004",
+      "code": "R-004",
+      "phaseId": "2",
+      "title": "Transcript Manager - Append Content",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a system, I want to append transcribed text to the file in real-time so that partial transcripts are never lost.",
+      "acceptanceCriteria": [
+        {
+          "text": "Append text to existing file"
+        },
+        {
+          "text": "Preserve frontmatter"
+        },
+        {
+          "text": "Atomic append operation (read + write temp + rename)"
+        },
+        {
+          "text": "Handle concurrent write safety"
+        },
+        {
+          "text": "No data corruption on crash"
+        },
+        {
+          "text": "Maintain proper line breaks"
+        }
+      ],
+      "technicalNotes": "```python\ndef append_to_transcript(filepath: Path, text: str):\n    \"\"\"Atomically append text to transcript\"\"\"\n    # Read existing\n    existing = filepath.read_text()\n\n    # Append new content\n    updated = existing + \"\\n\" + text\n\n    # Atomic write\n    write_file_atomic(filepath, updated)\n```",
+      "testRequirements": "- Test atomic append\n- Test with simulated crash mid-write\n- Test preserve frontmatter\n- Test concurrent append safety\n- Test large content append"
+    },
+    {
+      "id": "R-005",
+      "code": "R-005",
+      "phaseId": "2",
+      "title": "ID Normalization System",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to type just \"1\" instead of \"000001\" so that commands are faster and easier.",
+      "acceptanceCriteria": [
+        {
+          "text": "Accept \"1\", \"01\", \"001\", \"000001\" - all work"
+        },
+        {
+          "text": "Normalize to 6-digit format internally"
+        },
+        {
+          "text": "Display padded format in listings"
+        },
+        {
+          "text": "Case-insensitive ID lookup"
+        },
+        {
+          "text": "Handle invalid IDs gracefully"
+        }
+      ],
+      "technicalNotes": "```python\ndef normalize_id(user_input: str) -> str:\n    \"\"\"Convert any format to 6-digit ID\"\"\"\n    try:\n        num = int(user_input)\n        return str(num).zfill(6)\n    except ValueError:\n        raise InvalidIDError(f\"'{user_input}' is not a valid ID\")\n```",
+      "testRequirements": "- Test various input formats\n- Test invalid inputs\n- Test edge cases (negative, too large)"
+    },
+    {
+      "id": "R-006",
+      "code": "R-006",
+      "phaseId": "2",
+      "title": "Recording Control - Start",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to type \"rec\" and immediately start recording so that capturing ideas is effortless.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec` command starts recording"
+        },
+        {
+          "text": "Create transcript file first"
+        },
+        {
+          "text": "Start audio capture"
+        },
+        {
+          "text": "Show recording indicator"
+        },
+        {
+          "text": "Display duration counter"
+        },
+        {
+          "text": "Handle Ctrl+C gracefully"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef record():\n    # 1. Create transcript file immediately\n    filepath, tid = create_transcript()\n\n    # 2. Start audio capture\n    stream = start_audio_capture()\n\n    # 3. Show UI\n    show_recording_ui(filepath, tid)\n\n    # 4. Wait for stop signal\n    wait_for_stop()\n```",
+      "testRequirements": "- E2E test full recording flow\n- Test file created before audio starts\n- Test UI display\n- Test graceful shutdown"
+    },
+    {
+      "id": "R-007",
+      "code": "R-007",
+      "phaseId": "2",
+      "title": "Recording Control - Stop",
+      "priority": "Critical",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to press Enter to stop recording so that I have an obvious, simple way to finish.",
+      "acceptanceCriteria": [
+        {
+          "text": "Enter key stops recording cleanly"
+        },
+        {
+          "text": "Finalize transcript file"
+        },
+        {
+          "text": "Stop audio capture"
+        },
+        {
+          "text": "Update frontmatter status to \"completed\""
+        },
+        {
+          "text": "Show success message with file location"
+        },
+        {
+          "text": "Show next steps"
+        }
+      ],
+      "technicalNotes": "```python\ndef stop_recording(stream, filepath):\n    # Stop audio\n    stream.stop()\n    stream.close()\n\n    # Update frontmatter\n    update_status(filepath, \"completed\")\n\n    # Show completion UI\n    show_success(filepath)\n```",
+      "testRequirements": "- Test clean stop\n- Test frontmatter update\n- Test success message"
+    },
+    {
+      "id": "R-008",
+      "code": "R-008",
+      "phaseId": "2",
+      "title": "Recording Control - Cancel",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to press Ctrl+C to cancel a recording so that I can discard mistakes without keeping files.",
+      "acceptanceCriteria": [
+        {
+          "text": "Ctrl+C stops recording immediately"
+        },
+        {
+          "text": "Optionally delete transcript file"
+        },
+        {
+          "text": "Confirm before deletion"
+        },
+        {
+          "text": "Or mark as \"cancelled\" in frontmatter"
+        },
+        {
+          "text": "Clean shutdown"
+        }
+      ],
+      "technicalNotes": "```python\nfrom rich.prompt import Confirm\n\ndef handle_interrupt(stream, filepath):\n    # Called when KeyboardInterrupt is raised during wait_for_stop\n    cancelled = True\n    if not Confirm.ask(\n        \"Cancel recording? This will stop without finalising as completed.\",\n        default=True,\n    ):\n        cancelled = False\n\n    # Always stop/close the audio stream\n    stream.stop()\n    stream.close()\n\n    if cancelled:\n        # Offer optional deletion while preserving data by default\n        delete_file = Confirm.ask(\n            \"Delete the partial transcript file?\",\n            default=False,\n        )\n        if delete_file:\n            filepath.unlink()\n        else:\n            update_status(filepath, \"cancelled\")\n    else:\n        update_status(filepath, \"completed\")\n```",
+      "testRequirements": "- Test Ctrl+C handling\n- Test file deletion\n- Test confirmation prompt\n- Test cancelled status"
+    },
+    {
+      "id": "R-009",
+      "code": "R-009",
+      "phaseId": "2",
+      "title": "Recording UI - Progress Display",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to see recording status so that I know the system is working.",
+      "acceptanceCriteria": [
+        {
+          "text": "Show \"🔴 Recording...\" indicator"
+        },
+        {
+          "text": "Display elapsed time (0:00, 0:01, etc.)"
+        },
+        {
+          "text": "Update every second"
+        },
+        {
+          "text": "Clear instructions (Press Enter to stop)"
+        },
+        {
+          "text": "Microphone name shown"
+        },
+        {
+          "text": "Save location shown"
+        }
+      ],
+      "technicalNotes": "```python\nfrom rich.live import Live\nfrom rich.panel import Panel\n\ndef show_recording_ui(filepath, tid):\n    with Live(auto_refresh=False) as live:\n        while recording:\n            duration = get_elapsed_time()\n            panel = Panel(\n                f\"🔴 Recording... ({duration})\",\n                title=\"Rejoice\"\n            )\n            live.update(panel)\n            time.sleep(1)\n```",
+      "testRequirements": "- Test UI rendering\n- Test timer updates\n- Test clean display"
+    },
+    {
+      "id": "R-010",
+      "code": "R-010",
+      "phaseId": "2",
+      "title": "Audio Buffer Management",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a system, I want to buffer audio data efficiently so that transcription has access to complete audio without memory overflow.",
+      "acceptanceCriteria": [
+        {
+          "text": "Circular buffer for audio chunks"
+        },
+        {
+          "text": "Configurable buffer size (default: 30 seconds)"
+        },
+        {
+          "text": "Thread-safe read/write"
+        },
+        {
+          "text": "Provide audio segments to transcriber"
+        },
+        {
+          "text": "Handle overflow gracefully"
+        }
+      ],
+      "technicalNotes": "```python\nfrom collections import deque\nimport threading\n\nclass AudioBuffer:\n    def __init__(self, max_duration_seconds=30):\n        self.buffer = deque(maxlen=max_duration_seconds * 16)\n        self.lock = threading.RLock()\n\n    def write(self, chunk):\n        with self.lock:\n            self.buffer.append(chunk)\n\n    def read_segment(self, duration):\n        with self.lock:\n            return list(self.buffer)[-duration:]\n```",
+      "testRequirements": "- Test thread safety\n- Test overflow handling"
+    },
+    {
+      "id": "R-011",
+      "code": "R-011",
+      "phaseId": "2",
+      "title": "Transcript Filename Order Normalisation",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want transcript IDs at the start of filenames so that files are always ordered by ID in any file browser, even outside Rejoice.",
+      "acceptanceCriteria": [
+        {
+          "text": "New transcripts use `ID_transcript_YYYYMMDD.md` as the filename."
+        },
+        {
+          "text": "Existing transcripts with `transcript_YYYYMMDD_ID.md` continue to be recognised by all commands."
+        },
+        {
+          "text": "Listing and view commands show a consistent padded ID regardless of filename style."
+        },
+        {
+          "text": "A one-time migration helper can safely rename existing files without data loss (dry-run mode included)."
+        },
+        {
+          "text": "Behaviour is fully covered by unit tests for both old and new filename patterns."
+        }
+      ],
+      "technicalNotes": "```python\n# Extend TRANSCRIPT_FILENAME_PATTERN to support both variants during migration,\n# and prefer the new ID-first pattern for new files created by create_transcript().\n```",
+      "testRequirements": "- Unit tests for filename parsing of both old and new patterns.\n- Unit tests for creating new transcripts with the new pattern.\n- Unit/integration tests for the migration helper (including dry-run).\n- Test read/write operations\n- Test buffer size limits"
+    },
+    {
+      "id": "T-001",
+      "code": "T-001",
+      "phaseId": "3",
+      "title": "faster-whisper Integration",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want accurate transcription so that my spoken words are converted to text correctly.",
+      "acceptanceCriteria": [
+        {
+          "text": "faster-whisper library integrated"
+        },
+        {
+          "text": "Model downloading on first use"
+        },
+        {
+          "text": "Model caching for subsequent uses"
+        },
+        {
+          "text": "Support all model sizes (tiny, base, small, medium, large)"
+        },
+        {
+          "text": "Configurable via config.yaml"
+        },
+        {
+          "text": "Handle long audio without failure"
+        },
+        {
+          "text": "VAD filter enabled by default"
+        }
+      ],
+      "technicalNotes": "```python\nfrom faster_whisper import WhisperModel\n\nclass Transcriber:\n    def __init__(self, config):\n        self.model = WhisperModel(\n            config.model_size,\n            device=\"cpu\",\n            compute_type=\"int8\"\n        )\n\n    def transcribe(self, audio_path):\n        segments, info = self.model.transcribe(\n            audio_path,\n            vad_filter=True,\n            language=config.language\n        )\n        return segments\n```",
+      "testRequirements": "- Test with sample audio files\n- Test each model size\n- Test long audio (>30 min)\n- Test with silence periods\n- Test VAD filter effectiveness"
+    },
+    {
+      "id": "T-002",
+      "code": "T-002",
+      "phaseId": "3",
+      "title": "Language Detection & Control",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to control transcription language so that muffled English isn't detected as Chinese.",
+      "acceptanceCriteria": [
+        {
+          "text": "Auto-detect language by default"
+        },
+        {
+          "text": "Override with `--language en` flag"
+        },
+        {
+          "text": "Support all Whisper languages"
+        },
+        {
+          "text": "Save detected language in frontmatter"
+        },
+        {
+          "text": "Config file default language setting"
+        }
+      ],
+      "technicalNotes": "```python\n# Supported languages\nLANGUAGES = ['en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'ru', 'ja', 'ko', 'zh', ...]\n\ndef transcribe_with_language(audio, language='auto'):\n    if language == 'auto':\n        segments, info = model.transcribe(audio)\n        detected = info.language\n    else:\n        segments, info = model.transcribe(audio, language=language)\n        detected = language\n    return segments, detected\n```",
+      "testRequirements": "- Test auto-detection\n- Test forced language\n- Test with multiple languages\n- Test language saved to frontmatter"
+    },
+    {
+      "id": "T-003",
+      "code": "T-003",
+      "phaseId": "3",
+      "title": "Streaming Transcription to File",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want transcription to be saved continuously so that I never lose partial work if something crashes.",
+      "acceptanceCriteria": [
+        {
+          "text": "Transcribe audio in segments"
+        },
+        {
+          "text": "Append each segment to file immediately"
+        },
+        {
+          "text": "No buffering - write as soon as transcribed"
+        },
+        {
+          "text": "Handle streaming gracefully"
+        },
+        {
+          "text": "Coordinate with audio capture"
+        }
+      ],
+      "technicalNotes": "```python\ndef streaming_transcription(audio_stream, transcript_file):\n    for audio_chunk in audio_stream:\n        # Transcribe chunk\n        segment_text = transcribe_chunk(audio_chunk)\n\n        # Immediately append to file\n        append_to_transcript(transcript_file, segment_text)\n\n        # Show in UI (optional)\n        display_text(segment_text)\n```",
+      "testRequirements": "- Test continuous streaming\n- Test crash recovery (file has partial content)\n- Test with long recordings\n- Integration test full pipeline"
+    },
+    {
+      "id": "T-009",
+      "code": "T-009",
+      "phaseId": "3",
+      "title": "Connect Recording to Transcription",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want my recorded audio to be automatically transcribed so that when I run `rec`, I get a transcript file with actual text, not just metadata.",
+      "acceptanceCriteria": [
+        {
+          "text": "Audio from recording callback is saved to a temporary file during recording"
+        },
+        {
+          "text": "After recording stops, temporary audio file is passed to Transcriber"
+        },
+        {
+          "text": "Transcription runs automatically and appends text to transcript file"
+        },
+        {
+          "text": "Temporary audio file is cleaned up after transcription completes"
+        },
+        {
+          "text": "Transcription errors are handled gracefully without crashing the CLI"
+        },
+        {
+          "text": "Cancelled recordings skip transcription (no transcription attempted)"
+        },
+        {
+          "text": "Language from CLI `--language` flag is passed to Transcriber when provided"
+        }
+      ],
+      "technicalNotes": "```python\nimport wave\nimport tempfile\nfrom pathlib import Path\n\ndef start_recording_session():\n    # ... existing transcript creation ...\n\n    # Create temporary audio file\n    temp_audio = tempfile.NamedTemporaryFile(\n        suffix='.wav',\n        delete=False,\n        dir=save_dir\n    )\n    temp_audio_path = Path(temp_audio.name)\n\n    # Audio callback writes to WAV file\n    wav_file = wave.open(str(temp_audio_path), 'wb')\n    wav_file.setnchannels(1)  # mono\n    wav_file.setsampwidth(2)   # 16-bit\n    wav_file.setframerate(16000)  # 16kHz\n\n    def _audio_callback(indata, frames, timing, status):\n        # Write audio buffer to WAV file\n        wav_file.writeframes(indata.tobytes())\n\n    stream = record_audio(_audio_callback, ...)\n\n    try:\n        wait_for_stop()\n    finally:\n        stream.stop()\n        stream.close()\n        wav_file.close()\n\n        # Transcribe if not cancelled\n        if not cancelled:\n            try:\n                transcriber = Transcriber(config.transcription)\n                list(transcriber.stream_file_to_transcript(\n                    str(temp_audio_path),\n                    filepath\n                ))\n            except TranscriptionError as e:\n                console.print(f\"[yellow]Transcription failed: {e}[/yellow]\")\n            finally:\n                # Always clean up temp file\n                temp_audio_path.unlink(missing_ok=True)\n```",
+      "testRequirements": "- Test audio is saved correctly during recording\n- Test transcription runs after recording stops\n- Test transcript file contains transcribed text\n- Test temp file cleanup on success\n- Test temp file cleanup on error\n- Test cancellation skips transcription\n- Test language flag is passed through\n- Integration test full end-to-end flow"
+    },
+    {
+      "id": "T-010",
+      "code": "T-010",
+      "phaseId": "3",
+      "title": "Real-Time Incremental Transcription During Recording",
+      "priority": "High",
+      "estimate": "L",
+      "status": "Backlog",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to see my transcript appear in real-time as I speak so that I can verify the recording is working and see my words appear incrementally in the file.",
+      "acceptanceCriteria": [
+        {
+          "text": "Transcript file is updated incrementally as speech segments are confirmed"
+        },
+        {
+          "text": "Uses whisper_streaming library for real-time transcription"
+        },
+        {
+          "text": "User can see new content appearing in the transcript file while recording"
+        },
+        {
+          "text": "Partial audio is transcribed incrementally (not just at the end)"
+        },
+        {
+          "text": "Thread-safe file writing (no corruption from concurrent writes)"
+        },
+        {
+          "text": "Final transcription pass after recording stops to catch any remaining audio"
+        },
+        {
+          "text": "Configurable min-chunk-size (default: 1 second)"
+        },
+        {
+          "text": "Handle transcription errors gracefully without stopping recording"
+        },
+        {
+          "text": "Show visual indicator when transcription is updating (optional)"
+        },
+        {
+          "text": "Support VAD (Voice Activity Detection) for better segment detection"
+        }
+      ],
+      "technicalNotes": "```python\nimport threading\nfrom whisper_online import FasterWhisperASR, OnlineASRProcessor\nimport numpy as np\nfrom queue import Queue\n\ndef start_recording_with_realtime_transcription():\n    # Create transcript file\n    filepath, tid = create_transcript(save_dir)\n\n    # Initialize whisper_streaming\n    asr = FasterWhisperASR(\n        language=config.transcription.language or \"en\",\n        model_size=config.transcription.model\n    )\n    asr.use_vad()  # Enable VAD for better segment detection\n\n    online = OnlineASRProcessor(\n        asr,\n        buffer_trimming=\"segment\",  # Trim on confirmed segments\n        buffer_trimming_sec=30.0    # Trim buffer when >30s\n    )\n\n    # Audio buffer for streaming\n    audio_queue = Queue()\n    recording_active = threading.Event()\n    recording_active.set()\n\n    # Start audio capture\n    def audio_callback(indata, frames, timing, status):\n        # Write to WAV file (for final pass)\n        wav_file.writeframes(convert_to_int16(indata))\n        # Also send to streaming transcription\n        audio_queue.put(indata.copy())\n\n    stream = record_audio(audio_callback, ...)\n\n    # Start background transcription thread\n    transcription_thread = threading.Thread(\n        target=realtime_transcription_worker,\n        args=(online, filepath, audio_queue, recording_active),\n        daemon=True\n    )\n    transcription_thread.start()\n\n    # Wait for user to stop recording\n    wait_for_stop()\n\n    # Signal transcription to finish\n    recording_active.clear()\n    transcription_thread.join(timeout=5.0)\n\n    # Final transcription pass for any remaining audio\n    final_output = online.finish()\n    if final_output:\n        append_to_transcript(filepath, final_output)\n\ndef realtime_transcription_worker(online, filepath, audio_queue, recording_active):\n    \"\"\"Background thread that processes audio chunks in real-time\"\"\"\n    import librosa\n\n    min_chunk_size = 1.0  # seconds\n    accumulated_samples = []\n    sample_rate = 16000\n\n    while recording_active.is_set() or not audio_queue.empty():\n        # Collect audio chunks\n        try:\n            chunk = audio_queue.get(timeout=0.1)\n            accumulated_samples.append(chunk)\n        except queue.Empty:\n            continue\n\n        # Check if we have enough audio (min_chunk_size seconds)\n        total_samples = sum(len(c) for c in accumulated_samples)\n        total_seconds = total_samples / sample_rate\n\n        if total_seconds >= min_chunk_size:\n            # Convert accumulated audio to numpy array\n            audio_array = np.concatenate(accumulated_samples)\n\n            # Insert into whisper_streaming processor\n            online.insert_audio_chunk(audio_array)\n\n            # Process and get confirmed output\n            output = online.process_iter()\n\n            # Append confirmed segments to transcript file (thread-safe)\n            if output:\n                with file_lock:\n                    append_to_transcript(filepath, output)\n\n            # Reset accumulated samples (buffer trimming handled by OnlineASRProcessor)\n            accumulated_samples = []\n```\n\n**Dependencies:**\n- `whisper-streaming` (from GitHub: ufal/whisper_streaming)\n- `librosa>=0.10.0` (for audio processing)\n- `soundfile>=0.12.0` (for audio I/O)\n- `torch>=2.0.0` (for VAD, optional but recommended)\n- `torchaudio>=2.0.0` (for VAD, optional but recommended)\n\n**Installation:**\n```bash\npip install git+https://github.com/ufal/whisper_streaming\npip install librosa soundfile\npip install torch torchaudio  # Optional but recommended for VAD\n```",
+      "testRequirements": "- Test transcription updates incrementally during recording\n- Test thread-safe file writing (concurrent transcription + recording)\n- Test that final transcription pass catches remaining audio\n- Test error handling (transcription failure doesn't stop recording)\n- Test with long recordings (>5 minutes)\n- Test with silence periods (VAD should handle gracefully)\n- Integration test: verify transcript file grows during recording\n- Test configurable min-chunk-size\n- Test VAD integration"
+    },
+    {
+      "id": "T-004",
+      "code": "T-004",
+      "phaseId": "3",
+      "title": "VAD Configuration",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want silence detection to work properly so that long pauses don't cause transcription to fail.",
+      "acceptanceCriteria": [
+        {
+          "text": "VAD (Voice Activity Detection) enabled by default"
+        },
+        {
+          "text": "Configurable VAD threshold"
+        },
+        {
+          "text": "Test with long silence periods"
+        },
+        {
+          "text": "No failures on 30+ minute recordings with pauses"
+        }
+      ],
+      "technicalNotes": "```python\n# faster-whisper VAD parameters\nmodel.transcribe(\n    audio,\n    vad_filter=True,\n    vad_parameters=dict(\n        threshold=0.5,\n        min_silence_duration_ms=500\n    )\n)\n```",
+      "testRequirements": "- Test with speech + 5 min silence + speech\n- Test different VAD thresholds\n- Test lecture-style recordings with pauses"
+    },
+    {
+      "id": "T-005",
+      "code": "T-005",
+      "phaseId": "3",
+      "title": "Transcription Progress Indicator",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to see transcription progress so that I know how long it will take.",
+      "acceptanceCriteria": [
+        {
+          "text": "Show \"🔄 Transcribing...\" during processing"
+        },
+        {
+          "text": "Progress percentage if determinable"
+        },
+        {
+          "text": "Estimated time remaining"
+        },
+        {
+          "text": "Segments completed / total"
+        },
+        {
+          "text": "Clean, non-intrusive display"
+        }
+      ],
+      "technicalNotes": "```python\nfrom rich.progress import Progress\n\nwith Progress() as progress:\n    task = progress.add_task(\"Transcribing...\", total=duration)\n    for segment in transcribe(audio):\n        progress.update(task, advance=segment.duration)\n```",
+      "testRequirements": "- Test progress display\n- Test with various audio lengths\n- Test UI updates"
+    },
+    {
+      "id": "T-006",
+      "code": "T-006",
+      "phaseId": "3",
+      "title": "Handle Audio File Processing",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to transcribe existing audio files so that I can process recordings made elsewhere.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec process <file>` command works"
+        },
+        {
+          "text": "Support: mp3, wav, m4a, ogg, flac, aac"
+        },
+        {
+          "text": "Create transcript file with same ID system"
+        },
+        {
+          "text": "All transcription options available"
+        },
+        {
+          "text": "Progress indicator"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef process(filepath: Path, language: str = 'auto'):\n    # Validate file exists and is audio\n    validate_audio_file(filepath)\n\n    # Create transcript\n    transcript_file, tid = create_transcript()\n\n    # Transcribe\n    transcribe_file(filepath, transcript_file, language)\n\n    # Show results\n    show_completion(transcript_file, tid)\n```",
+      "testRequirements": "- Test with each audio format\n- Test with invalid files\n- Test with large files (>100MB)"
+    },
+    {
+      "id": "T-007",
+      "code": "T-007",
+      "phaseId": "3",
+      "title": "Handle Video File Processing",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to transcribe video files so that I can extract audio from recordings like Zoom meetings.",
+      "acceptanceCriteria": [
+        {
+          "text": "Support: mp4, mov, avi, mkv, webm"
+        },
+        {
+          "text": "Extract audio automatically"
+        },
+        {
+          "text": "Temporary audio file cleaned up after"
+        },
+        {
+          "text": "Progress shown for extraction + transcription"
+        }
+      ],
+      "technicalNotes": "```python\nimport ffmpeg\n\ndef extract_audio(video_path: Path) -> Path:\n    \"\"\"Extract audio from video file\"\"\"\n    audio_path = video_path.with_suffix('.wav')\n\n    ffmpeg.input(str(video_path)).output(\n        str(audio_path),\n        acodec='pcm_s16le',\n        ar='16000',\n        ac=1\n    ).run(quiet=True)\n\n    return audio_path\n```",
+      "testRequirements": "- Test with each video format\n- Test audio extraction quality\n- Test cleanup of temp files"
+    },
+    {
+      "id": "T-008",
+      "code": "T-008",
+      "phaseId": "3",
+      "title": "Batch File Processing",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to process multiple files at once so that I can batch-transcribe recorded meetings.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec process *.mp3` works"
+        },
+        {
+          "text": "`rec process /path/to/folder/` works"
+        },
+        {
+          "text": "Progress for each file"
+        },
+        {
+          "text": "Summary at end"
+        },
+        {
+          "text": "Continue on error (don't stop batch)"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef process(files: List[Path]):\n    results = []\n    for file in files:\n        try:\n            result = process_single_file(file)\n            results.append(('✅', file, result))\n        except Exception as e:\n            results.append(('❌', file, str(e)))\n\n    show_batch_summary(results)\n```",
+      "testRequirements": "- Test with multiple files\n- Test with mix of valid/invalid files\n- Test error handling"
+    },
+    {
+      "id": "A-001",
+      "code": "A-001",
+      "phaseId": "4",
+      "title": "WhisperX Integration",
+      "priority": "Medium",
+      "estimate": "L",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want speaker diarization so that I can identify who said what in conversations.",
+      "acceptanceCriteria": [
+        {
+          "text": "WhisperX library integrated"
+        },
+        {
+          "text": "Speaker diarization optional feature"
+        },
+        {
+          "text": "Label speakers as \"Speaker 1\", \"Speaker 2\", etc."
+        },
+        {
+          "text": "Maintain speaker consistency across segments"
+        },
+        {
+          "text": "Enable with `--speakers` flag"
+        }
+      ],
+      "technicalNotes": "```python\nimport whisperx\n\ndef transcribe_with_diarization(audio_path):\n    # Load audio\n    audio = whisperx.load_audio(audio_path)\n\n    # Transcribe\n    result = whisper_model.transcribe(audio)\n\n    # Align whisper output\n    result = whisperx.align(result, model, audio)\n\n    # Diarize\n    diarize_model = whisperx.DiarizationPipeline()\n    diarize_segments = diarize_model(audio)\n\n    # Assign speakers to segments\n    result = whisperx.assign_word_speakers(diarize_segments, result)\n\n    return result\n```",
+      "testRequirements": "- Test with multi-speaker audio\n- Test speaker consistency\n- Test with 2-5 speakers\n- Test accuracy with fixture files"
+    },
+    {
+      "id": "A-002",
+      "code": "A-002",
+      "phaseId": "4",
+      "title": "Speaker Label Formatting",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want speaker labels clearly shown in transcripts so that I can easily see who spoke.",
+      "acceptanceCriteria": [
+        {
+          "text": "Format: \"**Speaker 1:** [text]\""
+        },
+        {
+          "text": "Consistent labeling throughout"
+        },
+        {
+          "text": "Option to customize format in template"
+        },
+        {
+          "text": "Clear visual separation"
+        }
+      ],
+      "technicalNotes": "```markdown\n**Speaker 1:** So we discussed the Q4 roadmap today.\n\n**Speaker 2:** Yes, and we decided to prioritize the mobile app launch.\n\n**Speaker 1:** Right, Sarah mentioned the timeline concerns.\n```",
+      "testRequirements": "- Test formatting\n- Test with multiple speakers\n- Test format customization"
+    },
+    {
+      "id": "A-003",
+      "code": "A-003",
+      "phaseId": "4",
+      "title": "Timestamp Integration",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want timestamps in my transcript so that I can reference specific moments in the recording.",
+      "acceptanceCriteria": [
+        {
+          "text": "Timestamps at segment boundaries"
+        },
+        {
+          "text": "Format: `[00:00]`, `[00:42]`, `[12:34]`"
+        },
+        {
+          "text": "Toggle with `--timestamps` flag"
+        },
+        {
+          "text": "Configurable in config.yaml"
+        },
+        {
+          "text": "Option to show only on speaker changes"
+        }
+      ],
+      "technicalNotes": "```markdown\n[00:00] So today we discussed the Q4 roadmap and decided to prioritize the mobile app launch.\n\n[00:15] Sarah mentioned that the timeline is tight but achievable.\n\n[00:32] We need to coordinate with the design team.\n```",
+      "testRequirements": "- Test timestamp accuracy\n- Test formatting\n- Test toggle on/off"
+    },
+    {
+      "id": "A-004",
+      "code": "A-004",
+      "phaseId": "4",
+      "title": "Combined Speaker + Timestamp",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want both speakers and timestamps so that I have complete context for conversations.",
+      "acceptanceCriteria": [
+        {
+          "text": "Format: `[00:00] **Speaker 1:** [text]`"
+        },
+        {
+          "text": "Enable with `--speakers --timestamps`"
+        },
+        {
+          "text": "Clean, readable output"
+        }
+      ],
+      "technicalNotes": "```markdown\n[00:00] **Speaker 1:** So we discussed the Q4 roadmap today.\n\n[00:12] **Speaker 2:** Yes, and we decided to prioritize the mobile app launch.\n\n[00:28] **Speaker 1:** Right, Sarah mentioned the timeline concerns.\n```",
+      "testRequirements": "- Test combined formatting\n- Test readability\n- Test toggle combinations"
+    },
+    {
+      "id": "A-005",
+      "code": "A-005",
+      "phaseId": "4",
+      "title": "Transcription Quality Metrics",
+      "priority": "Low",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to know transcription quality so that I can decide if I need to re-transcribe with a better model.",
+      "acceptanceCriteria": [
+        {
+          "text": "Show confidence scores in frontmatter"
+        },
+        {
+          "text": "Average confidence per segment"
+        },
+        {
+          "text": "Flag low-confidence segments"
+        },
+        {
+          "text": "Optional: highlight uncertain words"
+        }
+      ],
+      "technicalNotes": "```yaml\n---\ntranscription:\n  avg_confidence: 0.87\n  low_confidence_segments: 3\n  language_confidence: 0.95\n---\n```",
+      "testRequirements": "- Test confidence calculation\n- Test with clear vs unclear audio\n- Test metrics accuracy"
+    },
+    {
+      "id": "AI-001",
+      "code": "AI-001",
+      "phaseId": "5",
+      "title": "Ollama Client Integration",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want AI-powered analysis so that I can extract insights from transcripts.",
+      "acceptanceCriteria": [
+        {
+          "text": "Ollama REST API integration"
+        },
+        {
+          "text": "Connection test: `rec doctor ollama`"
+        },
+        {
+          "text": "Model selection configurable"
+        },
+        {
+          "text": "Handle Ollama not running gracefully"
+        },
+        {
+          "text": "Streaming response support"
+        }
+      ],
+      "technicalNotes": "```python\nimport requests\n\nclass OllamaClient:\n    def __init__(self, base_url='http://localhost:11434'):\n        self.base_url = base_url\n\n    def generate(self, prompt, model='llama2'):\n        response = requests.post(\n            f'{self.base_url}/api/generate',\n            json={'model': model, 'prompt': prompt}\n        )\n        return response.json()\n```",
+      "testRequirements": "- Test connection\n- Test with/without Ollama running\n- Test different models\n- Test streaming"
+    },
+    {
+      "id": "AI-002",
+      "code": "AI-002",
+      "phaseId": "5",
+      "title": "Prompt Template System",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to customize AI prompts so that I can tailor analysis to my needs.",
+      "acceptanceCriteria": [
+        {
+          "text": "Prompt templates stored in `~/.config/rejoice/prompts/`"
+        },
+        {
+          "text": "Templates are editable text files"
+        },
+        {
+          "text": "Variables: `{transcript}`, `{language}`, `{duration}`"
+        },
+        {
+          "text": "Default templates included"
+        },
+        {
+          "text": "Easy to create custom templates"
+        }
+      ],
+      "technicalNotes": "```\n~/.config/rejoice/prompts/\n├── summary.txt\n├── tags.txt\n├── questions.txt\n├── actions.txt\n└── title.txt\n```\n\n```\n# summary.txt\nAnalyze this transcript and provide a concise summary:\n\n{transcript}\n\nFocus on:\n- Main themes\n- Key decisions\n- Important points\n\nSummary:\n```",
+      "testRequirements": "- Test template loading\n- Test variable substitution\n- Test custom templates\n- Test missing templates (use defaults)"
+    },
+    {
+      "id": "AI-003",
+      "code": "AI-003",
+      "phaseId": "5",
+      "title": "Summary Generation",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want AI summaries so that I can quickly understand transcript content without reading everything.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec analyze <id>` generates summary"
+        },
+        {
+          "text": "Summary added to frontmatter"
+        },
+        {
+          "text": "2-3 sentence concise summary"
+        },
+        {
+          "text": "Captures main themes"
+        },
+        {
+          "text": "Works with long transcripts (chunking if needed)"
+        }
+      ],
+      "technicalNotes": "```python\ndef generate_summary(transcript_text):\n    prompt = load_template('summary.txt').format(\n        transcript=transcript_text\n    )\n    summary = ollama_client.generate(prompt)\n    return summary.strip()\n```",
+      "testRequirements": "- Test with short transcripts\n- Test with long transcripts\n- Test summary quality\n- Test frontmatter update"
+    },
+    {
+      "id": "AI-004",
+      "code": "AI-004",
+      "phaseId": "5",
+      "title": "Tag Generation",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want automatic tags so that transcripts are organized and searchable.",
+      "acceptanceCriteria": [
+        {
+          "text": "Generate 3-7 relevant tags"
+        },
+        {
+          "text": "Tags based on content themes"
+        },
+        {
+          "text": "Added to frontmatter as YAML array"
+        },
+        {
+          "text": "Lowercase, hyphenated format"
+        }
+      ],
+      "technicalNotes": "```yaml\ntags: [meeting, project-alpha, timeline, q4-planning]\n```",
+      "testRequirements": "- Test tag relevance\n- Test tag format\n- Test number of tags (3-7)"
+    },
+    {
+      "id": "AI-005",
+      "code": "AI-005",
+      "phaseId": "5",
+      "title": "Title Generation",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want descriptive file names so that I can identify transcripts without opening them.",
+      "acceptanceCriteria": [
+        {
+          "text": "Generate descriptive title (3-7 words)"
+        },
+        {
+          "text": "Replace generic \"transcript_YYYYMMDD_ID.md\" name"
+        },
+        {
+          "text": "Format: \"descriptive_title_YYYYMMDD_ID.md\""
+        },
+        {
+          "text": "Rename file atomically"
+        },
+        {
+          "text": "Title also added to frontmatter"
+        }
+      ],
+      "technicalNotes": "```python\ndef rename_with_title(filepath, title):\n    # Sanitize title for filename\n    safe_title = sanitize_filename(title)\n\n    # Keep date and ID\n    parts = filepath.stem.split('_')\n    date_id = '_'.join(parts[-2:])  # YYYYMMDD_ID\n\n    # New name\n    new_name = f\"{safe_title}_{date_id}.md\"\n    new_path = filepath.parent / new_name\n\n    # Atomic rename\n    filepath.rename(new_path)\n```",
+      "testRequirements": "- Test title generation quality\n- Test filename sanitization\n- Test atomic rename\n- Test title in frontmatter"
+    },
+    {
+      "id": "AI-006",
+      "code": "AI-006",
+      "phaseId": "5",
+      "title": "Question Extraction",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want key questions extracted so that I can identify discussion points and decisions needed.",
+      "acceptanceCriteria": [
+        {
+          "text": "Extract main questions asked"
+        },
+        {
+          "text": "Extract unanswered questions"
+        },
+        {
+          "text": "List in frontmatter"
+        },
+        {
+          "text": "Format as bullet list"
+        }
+      ],
+      "technicalNotes": "```yaml\nquestions:\n  - \"What's the timeline for mobile app launch?\"\n  - \"Who will coordinate with the design team?\"\n  - \"Do we have budget approval?\"\n```",
+      "testRequirements": "- Test question extraction accuracy\n- Test with transcripts containing questions\n- Test with no questions"
+    },
+    {
+      "id": "AI-007",
+      "code": "AI-007",
+      "phaseId": "5",
+      "title": "Action Item Extraction",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want action items extracted so that I know what needs to be done next.",
+      "acceptanceCriteria": [
+        {
+          "text": "Extract actionable items"
+        },
+        {
+          "text": "Identify who is responsible (if mentioned)"
+        },
+        {
+          "text": "Extract deadlines (if mentioned)"
+        },
+        {
+          "text": "List in frontmatter"
+        }
+      ],
+      "technicalNotes": "```yaml\naction_items:\n  - \"Sarah to create timeline for mobile app\"\n  - \"Schedule meeting with design team by Friday\"\n  - \"Get budget approval before next sprint\"\n```",
+      "testRequirements": "- Test action extraction accuracy\n- Test responsibility detection\n- Test deadline extraction"
+    },
+    {
+      "id": "AI-008",
+      "code": "AI-008",
+      "phaseId": "5",
+      "title": "Full Analysis Command",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want one command to run all AI analysis so that I get comprehensive insights easily.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec analyze <id>` runs all analyses"
+        },
+        {
+          "text": "`rec analyze <id> --full` includes extended analysis"
+        },
+        {
+          "text": "Progress indicator for each step"
+        },
+        {
+          "text": "All results added to frontmatter"
+        },
+        {
+          "text": "File renamed with AI title"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef analyze(transcript_id: str, full: bool = False):\n    # Load transcript\n    filepath = get_transcript_path(transcript_id)\n    text = read_transcript_body(filepath)\n\n    # Run analyses\n    with Progress() as progress:\n        task = progress.add_task(\"Analyzing...\", total=5)\n\n        title = generate_title(text)\n        progress.advance(task)\n\n        summary = generate_summary(text)\n        progress.advance(task)\n\n        tags = generate_tags(text)\n        progress.advance(task)\n\n        questions = extract_questions(text)\n        progress.advance(task)\n\n        actions = extract_actions(text)\n        progress.advance(task)\n\n    # Update frontmatter\n    update_frontmatter(filepath, {\n        'title': title,\n        'summary': summary,\n        'tags': tags,\n        'questions': questions,\n        'action_items': actions\n    })\n\n    # Rename file\n    rename_with_title(filepath, title)\n```",
+      "testRequirements": "- Test full analysis pipeline\n- Test with various transcript types\n- Test progress display\n- Integration test all AI features"
+    },
+    {
+      "id": "AI-009",
+      "code": "AI-009",
+      "phaseId": "5",
+      "title": "Analyze External Files",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to analyze any text file so that I can enhance existing notes with AI.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec analyze /path/to/file.txt` works"
+        },
+        {
+          "text": "Convert .txt to .md if needed"
+        },
+        {
+          "text": "Add frontmatter if missing"
+        },
+        {
+          "text": "Update frontmatter if exists"
+        },
+        {
+          "text": "Save as new file or overwrite (user choice)"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef analyze(path: Path, in_place: bool = False):\n    # Read file\n    content = path.read_text()\n\n    # Check if has frontmatter\n    has_fm, fm, body = parse_markdown(content)\n\n    # Run AI analysis\n    analysis = run_full_analysis(body)\n\n    # Merge with existing frontmatter\n    new_fm = {**fm, **analysis}\n\n    # Write output\n    if in_place:\n        output_path = path\n    else:\n        output_path = path.with_stem(f\"{path.stem}_analyzed\")\n\n    write_markdown(output_path, new_fm, body)\n```",
+      "testRequirements": "- Test with .txt files\n- Test with .md files (with/without frontmatter)\n- Test in-place vs new file\n- Test frontmatter merging"
+    },
+    {
+      "id": "AI-010",
+      "code": "AI-010",
+      "phaseId": "5",
+      "title": "Batch Analyze Files",
+      "priority": "Low",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to batch analyze multiple files so that I can enhance entire folders of notes.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec analyze *.txt` works"
+        },
+        {
+          "text": "`rec analyze /path/to/folder/` works"
+        },
+        {
+          "text": "Progress for each file"
+        },
+        {
+          "text": "Summary at end"
+        },
+        {
+          "text": "Skip errors, continue processing"
+        }
+      ],
+      "technicalNotes": "```python\nfor file in files:\n    try:\n        analyze_single_file(file)\n        results.append(('✅', file))\n    except Exception as e:\n        results.append(('❌', file, str(e)))\n```",
+      "testRequirements": "- Test batch processing\n- Test with mix of file types\n- Test error handling"
+    },
+    {
+      "id": "C-001",
+      "code": "C-001",
+      "phaseId": "6",
+      "title": "List Recordings Command",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to see all my recordings so that I can find what I'm looking for.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec list` shows all transcripts"
+        },
+        {
+          "text": "Display: ID | Date | Filename"
+        },
+        {
+          "text": "Sorted by date (newest first)"
+        },
+        {
+          "text": "Pagination for many files"
+        },
+        {
+          "text": "Total count shown"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef list_recordings(limit: int = 50):\n    files = get_all_transcripts()\n    files.sort(key=lambda f: f.stat().st_mtime, reverse=True)\n\n    table = Table(title=\"Your Recordings\")\n    table.add_column(\"ID\")\n    table.add_column(\"Date\")\n    table.add_column(\"Filename\")\n\n    for f in files[:limit]:\n        id = extract_id(f)\n        date = format_date(f.stat().st_mtime)\n        table.add_row(id, date, f.name)\n\n    console.print(table)\n```",
+      "testRequirements": "- Test with no recordings\n- Test with many recordings\n- Test sorting\n- Test pagination"
+    },
+    {
+      "id": "C-002",
+      "code": "C-002",
+      "phaseId": "6",
+      "title": "List with Filters",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to filter recordings so that I can find specific ones quickly.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec list --recent 10` (last N recordings)"
+        },
+        {
+          "text": "`rec list --after \"2024-12-01\"`"
+        },
+        {
+          "text": "`rec list --before \"2024-12-31\"`"
+        },
+        {
+          "text": "`rec list --tag meeting`"
+        },
+        {
+          "text": "`rec list --search \"keyword\"`"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef list_recordings(\n    recent: int = None,\n    after: str = None,\n    before: str = None,\n    tag: str = None,\n    search: str = None\n):\n    files = get_all_transcripts()\n\n    # Apply filters\n    if recent:\n        files = files[:recent]\n    if after:\n        files = [f for f in files if f.date >= parse_date(after)]\n    # ... other filters\n\n    display_recordings(files)\n```",
+      "testRequirements": "- Test each filter independently\n- Test combined filters\n- Test date parsing"
+    },
+    {
+      "id": "C-003",
+      "code": "C-003",
+      "phaseId": "6",
+      "title": "View Transcript Command",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to read a transcript in the terminal so that I can review content quickly.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec view <id>` displays transcript"
+        },
+        {
+          "text": "Syntax highlighting for markdown"
+        },
+        {
+          "text": "Frontmatter shown separately (or hidden by default)"
+        },
+        {
+          "text": "Pagination for long transcripts"
+        },
+        {
+          "text": "`rec view latest` shows most recent"
+        }
+      ],
+      "technicalNotes": "```python\nfrom rich.markdown import Markdown\n\n@app.command()\ndef view(transcript_id: str = 'latest'):\n    if transcript_id == 'latest':\n        filepath = get_latest_transcript()\n    else:\n        filepath = get_transcript_by_id(transcript_id)\n\n    content = filepath.read_text()\n    fm, body = parse_markdown(content)\n\n    # Show frontmatter (optional)\n    show_frontmatter(fm)\n\n    # Render markdown\n    md = Markdown(body)\n    console.print(md)\n```",
+      "testRequirements": "- Test view by ID\n- Test view latest\n- Test with long transcripts\n- Test markdown rendering"
+    },
+    {
+      "id": "C-004",
+      "code": "C-004",
+      "phaseId": "6",
+      "title": "Continue/Append Command",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to add more content to an existing transcript so that I can continue my thoughts later.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec continue <id>` starts recording"
+        },
+        {
+          "text": "Appends to existing transcript"
+        },
+        {
+          "text": "Preserves frontmatter"
+        },
+        {
+          "text": "Shows clear separator between sessions"
+        },
+        {
+          "text": "Updates \"last_modified\" timestamp"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef continue_recording(transcript_id: str):\n    filepath = get_transcript_by_id(transcript_id)\n\n    # Add session marker\n    append_to_transcript(filepath, \"\\n\\n---\\n\\n\")\n    append_to_transcript(filepath, f\"## Continued: {datetime.now()}\\n\\n\")\n\n    # Start recording, append mode\n    record_audio_to_file(filepath, append_mode=True)\n```",
+      "testRequirements": "- Test append to existing file\n- Test session markers\n- Test frontmatter preservation\n- Test timestamp update"
+    },
+    {
+      "id": "C-005",
+      "code": "C-005",
+      "phaseId": "6",
+      "title": "Open in Editor Command",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to open transcripts in my editor so that I can edit and enhance them.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec open <id>` opens in default markdown editor"
+        },
+        {
+          "text": "`rec open <id> --editor vim` uses specific editor"
+        },
+        {
+          "text": "Detect: VSCode, Obsidian, vim, nano, etc."
+        },
+        {
+          "text": "Configure default in config.yaml"
+        }
+      ],
+      "technicalNotes": "```python\nimport subprocess\n\n@app.command()\ndef open_transcript(transcript_id: str, editor: str = None):\n    filepath = get_transcript_by_id(transcript_id)\n\n    if editor:\n        cmd = [editor, str(filepath)]\n    else:\n        cmd = [config.default_editor, str(filepath)]\n\n    subprocess.run(cmd)\n```",
+      "testRequirements": "- Test with different editors\n- Test default editor\n- Test editor not found"
+    },
+    {
+      "id": "C-006",
+      "code": "C-006",
+      "phaseId": "6",
+      "title": "Delete Command",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to delete unwanted transcripts so that I can keep my collection clean.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec delete <id>` removes transcript"
+        },
+        {
+          "text": "Confirmation prompt before deletion"
+        },
+        {
+          "text": "`rec delete <id> --force` skips confirmation"
+        },
+        {
+          "text": "Also delete associated audio files (if any)"
+        },
+        {
+          "text": "Show what will be deleted"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef delete_transcript(transcript_id: str, force: bool = False):\n    filepath = get_transcript_by_id(transcript_id)\n    audio_files = get_associated_audio(transcript_id)\n\n    # Show what will be deleted\n    console.print(f\"Will delete:\\n  {filepath.name}\")\n    if audio_files:\n        console.print(f\"  {len(audio_files)} audio file(s)\")\n\n    # Confirm\n    if not force:\n        if not Confirm.ask(\"Are you sure?\"):\n            return\n\n    # Delete\n    filepath.unlink()\n    for audio_file in audio_files:\n        audio_file.unlink()\n```",
+      "testRequirements": "- Test deletion with confirmation\n- Test force deletion\n- Test deletion of audio files\n- Test cancelled deletion"
+    },
+    {
+      "id": "C-007",
+      "code": "C-007",
+      "phaseId": "6",
+      "title": "Search Transcripts",
+      "priority": "Low",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to search transcript content so that I can find specific information across all recordings.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec search \"keyword\"` finds matches"
+        },
+        {
+          "text": "Search in transcript body and frontmatter"
+        },
+        {
+          "text": "Show context around matches"
+        },
+        {
+          "text": "Highlight matched text"
+        },
+        {
+          "text": "Show which transcript contains matches"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef search(query: str):\n    results = []\n    for transcript in get_all_transcripts():\n        content = transcript.read_text()\n        if query.lower() in content.lower():\n            # Find context\n            context = extract_context(content, query)\n            results.append((transcript, context))\n\n    display_search_results(results, query)\n```",
+      "testRequirements": "- Test case-insensitive search\n- Test context extraction\n- Test with multiple matches\n- Test with no matches"
+    },
+    {
+      "id": "C-008",
+      "code": "C-008",
+      "phaseId": "6",
+      "title": "Fuzzy ID/Filename Matching",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want typo tolerance so that small mistakes don't prevent me from finding transcripts.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec view meetnig` suggests \"meeting_notes.md\""
+        },
+        {
+          "text": "`rec analyze brain` matches \"brainstorm.md\""
+        },
+        {
+          "text": "Partial matches work"
+        },
+        {
+          "text": "Show suggestions if no exact match"
+        }
+      ],
+      "technicalNotes": "```python\nfrom difflib import get_close_matches\n\ndef find_transcript_fuzzy(user_input: str):\n    all_files = get_all_transcripts()\n    filenames = [f.stem for f in all_files]\n\n    # Try exact match first\n    if user_input in filenames:\n        return get_transcript_by_name(user_input)\n\n    # Try fuzzy match\n    matches = get_close_matches(user_input, filenames, n=3, cutoff=0.6)\n\n    if matches:\n        console.print(f\"Did you mean: {matches[0]}?\")\n        if Confirm.ask(\"Use this?\"):\n            return get_transcript_by_name(matches[0])\n```",
+      "testRequirements": "- Test typo correction\n- Test partial matches\n- Test suggestion UI\n- Test no matches"
+    },
+    {
+      "id": "C-009",
+      "code": "C-009",
+      "phaseId": "6",
+      "title": "Copy to Clipboard",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to copy transcripts to clipboard so that I can paste them elsewhere easily.",
+      "acceptanceCriteria": [
+        {
+          "text": "Auto-copy after recording (configurable)"
+        },
+        {
+          "text": "`rec copy <id>` manually copies"
+        },
+        {
+          "text": "Cross-platform support (macOS, Linux, Windows)"
+        },
+        {
+          "text": "Success confirmation"
+        }
+      ],
+      "technicalNotes": "```python\nimport pyperclip\n\n@app.command()\ndef copy_transcript(transcript_id: str):\n    filepath = get_transcript_by_id(transcript_id)\n    content = read_transcript_body(filepath)  # Without frontmatter\n\n    pyperclip.copy(content)\n    console.print(\"✅ Copied to clipboard!\")\n```",
+      "testRequirements": "- Test clipboard copy\n- Test auto-copy after recording\n- Test on different platforms\n- Test with large content"
+    },
+    {
+      "id": "C-010",
+      "code": "C-010",
+      "phaseId": "6",
+      "title": "Export Transcript",
+      "priority": "Low",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to export transcripts in different formats so that I can use them in other applications.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec export <id> --format pdf`"
+        },
+        {
+          "text": "`rec export <id> --format docx`"
+        },
+        {
+          "text": "`rec export <id> --format txt` (plain text)"
+        },
+        {
+          "text": "Preserve formatting where possible"
+        }
+      ],
+      "technicalNotes": "```python\nfrom docx import Document\nimport markdown2\n\n@app.command()\ndef export(transcript_id: str, format: str = 'pdf'):\n    content = get_transcript_content(transcript_id)\n\n    if format == 'pdf':\n        export_to_pdf(content)\n    elif format == 'docx':\n        export_to_docx(content)\n    elif format == 'txt':\n        export_to_txt(content)\n```",
+      "testRequirements": "- Test each export format\n- Test formatting preservation\n- Test with various content types"
+    },
+    {
+      "id": "S-001",
+      "code": "S-001",
+      "phaseId": "7",
+      "title": "Interactive Settings Menu",
+      "priority": "High",
+      "estimate": "L",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want a friendly settings interface so that I don't have to manually edit config files.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec settings` opens interactive menu"
+        },
+        {
+          "text": "Navigate with arrow keys"
+        },
+        {
+          "text": "Change settings in-place"
+        },
+        {
+          "text": "Show current values"
+        },
+        {
+          "text": "Validate inputs"
+        },
+        {
+          "text": "Save changes to config.yaml"
+        }
+      ],
+      "technicalNotes": "```python\nfrom rich.prompt import Prompt, Confirm\n\n@app.command()\ndef settings():\n    while True:\n        choice = show_settings_menu()\n\n        if choice == 'transcription':\n            transcription_settings()\n        elif choice == 'output':\n            output_settings()\n        # ... etc\n```",
+      "testRequirements": "- Test menu navigation\n- Test setting updates\n- Test input validation\n- Test config file updates"
+    },
+    {
+      "id": "S-002",
+      "code": "S-002",
+      "phaseId": "7",
+      "title": "Microphone Configuration",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to select my microphone so that Rejoice uses the right input device.",
+      "acceptanceCriteria": [
+        {
+          "text": "List available microphones"
+        },
+        {
+          "text": "Show current selection"
+        },
+        {
+          "text": "Test microphone with live audio level meter"
+        },
+        {
+          "text": "Save selection to config"
+        }
+      ],
+      "technicalNotes": "```python\ndef microphone_settings():\n    devices = get_audio_devices()\n\n    # Show list\n    for i, device in enumerate(devices):\n        console.print(f\"{i}. {device['name']}\")\n\n    # Get selection\n    choice = Prompt.ask(\"Select microphone\", default=\"0\")\n\n    # Test microphone\n    if Confirm.ask(\"Test this microphone?\"):\n        test_microphone(devices[int(choice)])\n\n    # Save\n    config.update({'audio': {'device': int(choice)}})\n```",
+      "testRequirements": "- Test device listing\n- Test device selection\n- Test microphone test\n- Test config save"
+    },
+    {
+      "id": "S-003",
+      "code": "S-003",
+      "phaseId": "7",
+      "title": "Model Configuration",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to choose transcription model size so that I can balance speed vs accuracy.",
+      "acceptanceCriteria": [
+        {
+          "text": "List available models (tiny, base, small, medium, large)"
+        },
+        {
+          "text": "Show model size and expected performance"
+        },
+        {
+          "text": "Download model if not cached"
+        },
+        {
+          "text": "Test transcription with selected model"
+        }
+      ],
+      "technicalNotes": "```python\nMODELS = {\n    'tiny': {'size': '75MB', 'speed': 'Very Fast', 'accuracy': 'Good'},\n    'base': {'size': '142MB', 'speed': 'Fast', 'accuracy': 'Better'},\n    'small': {'size': '466MB', 'speed': 'Medium', 'accuracy': 'Great'},\n    'medium': {'size': '1.5GB', 'speed': 'Slow', 'accuracy': 'Excellent'},\n    'large': {'size': '2.9GB', 'speed': 'Very Slow', 'accuracy': 'Best'},\n}\n```",
+      "testRequirements": "- Test model selection\n- Test model download\n- Test with different models\n- Test config save"
+    },
+    {
+      "id": "S-004",
+      "code": "S-004",
+      "phaseId": "7",
+      "title": "Save Location Configuration",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to choose where transcripts are saved so that they integrate with my note-taking system.",
+      "acceptanceCriteria": [
+        {
+          "text": "Set custom save path"
+        },
+        {
+          "text": "Validate path exists"
+        },
+        {
+          "text": "Create directory if doesn't exist"
+        },
+        {
+          "text": "Expand `~` for home directory"
+        },
+        {
+          "text": "Show current location"
+        }
+      ],
+      "technicalNotes": "```python\ndef output_settings():\n    current = config.output.save_path\n    console.print(f\"Current: {current}\")\n\n    new_path = Prompt.ask(\"New save location\", default=str(current))\n    path = Path(new_path).expanduser()\n\n    if not path.exists():\n        if Confirm.ask(f\"Create {path}?\"):\n            path.mkdir(parents=True)\n\n    config.update({'output': {'save_path': str(path)}})\n```",
+      "testRequirements": "- Test path validation\n- Test directory creation\n- Test home expansion\n- Test config save"
+    },
+    {
+      "id": "S-005",
+      "code": "S-005",
+      "phaseId": "7",
+      "title": "Template Customization",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to customize the markdown template so that frontmatter matches my note system.",
+      "acceptanceCriteria": [
+        {
+          "text": "Edit template in default editor"
+        },
+        {
+          "text": "Template variables documented"
+        },
+        {
+          "text": "Validate template syntax"
+        },
+        {
+          "text": "Preview template output"
+        },
+        {
+          "text": "Reset to default option"
+        }
+      ],
+      "technicalNotes": "```yaml\n# Template variables:\n# ${date} - Current date\n# ${time} - Current time\n# ${id} - Transcript ID\n# ${ai_title} - AI-generated title\n# ${ai_summary} - AI summary\n# ${ai_tags} - AI tags\n# ${language} - Detected language\n# ${duration} - Recording duration\n```",
+      "testRequirements": "- Test template editing\n- Test variable substitution\n- Test template validation\n- Test reset to default"
+    },
+    {
+      "id": "S-006",
+      "code": "S-006",
+      "phaseId": "7",
+      "title": "Default Behaviors Configuration",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to set defaults so that I don't have to specify flags every time.",
+      "acceptanceCriteria": [
+        {
+          "text": "Default: auto-analyze after recording"
+        },
+        {
+          "text": "Default: auto-copy to clipboard"
+        },
+        {
+          "text": "Default: speaker diarization on/off"
+        },
+        {
+          "text": "Default: timestamps on/off"
+        },
+        {
+          "text": "Default: language"
+        },
+        {
+          "text": "All overridable with flags"
+        }
+      ],
+      "technicalNotes": "```yaml\nfeatures:\n  auto_analyze: true\n  auto_copy: true\n  speaker_diarization: false\n  timestamps: false\n\ntranscription:\n  default_language: auto\n```",
+      "testRequirements": "- Test each default setting\n- Test flag overrides\n- Test config save"
+    },
+    {
+      "id": "S-007",
+      "code": "S-007",
+      "phaseId": "7",
+      "title": "Ollama Configuration",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to configure Ollama settings so that AI features work with my setup.",
+      "acceptanceCriteria": [
+        {
+          "text": "Set Ollama URL (default: localhost:11434)"
+        },
+        {
+          "text": "Set default model (llama2, mistral, etc.)"
+        },
+        {
+          "text": "Test connection"
+        },
+        {
+          "text": "List available models"
+        }
+      ],
+      "technicalNotes": "```python\ndef ollama_settings():\n    current_url = config.ai.ollama_url\n    current_model = config.ai.model\n\n    # Test connection\n    if test_ollama_connection(current_url):\n        console.print(\"✅ Connected to Ollama\")\n\n        # Show available models\n        models = list_ollama_models(current_url)\n        console.print(f\"Available models: {', '.join(models)}\")\n```",
+      "testRequirements": "- Test URL configuration\n- Test connection testing\n- Test model listing\n- Test config save"
+    },
+    {
+      "id": "S-008",
+      "code": "S-008",
+      "phaseId": "7",
+      "title": "Doctor/Health Check Command",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to diagnose issues so that I can fix problems myself.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec doctor` checks system health"
+        },
+        {
+          "text": "Check: Python version"
+        },
+        {
+          "text": "Check: Dependencies installed"
+        },
+        {
+          "text": "Check: Microphone access"
+        },
+        {
+          "text": "Check: Ollama running"
+        },
+        {
+          "text": "Check: Disk space"
+        },
+        {
+          "text": "Check: Config file valid"
+        },
+        {
+          "text": "Suggest fixes for problems"
+        }
+      ],
+      "technicalNotes": "```python\n@app.command()\ndef doctor():\n    checks = []\n\n    # Python version\n    if sys.version_info >= (3, 8):\n        checks.append((\"✅\", \"Python version\", f\"{sys.version}\"))\n    else:\n        checks.append((\"❌\", \"Python version\", \"Requires >= 3.8\"))\n\n    # Dependencies\n    try:\n        import faster_whisper\n        checks.append((\"✅\", \"faster-whisper\", \"Installed\"))\n    except ImportError:\n        checks.append((\"❌\", \"faster-whisper\", \"Not installed\"))\n\n    # ... more checks\n\n    display_health_report(checks)\n```",
+      "testRequirements": "- Test all checks\n- Test with problems present\n- Test fix suggestions\n- Test on different systems"
+    },
+    {
+      "id": "S-009",
+      "code": "S-009",
+      "phaseId": "7",
+      "title": "Version & Update Check",
+      "priority": "Low",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to know if updates are available so that I can stay current.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec --version` shows current version"
+        },
+        {
+          "text": "`rec update check` checks for updates"
+        },
+        {
+          "text": "Compare with GitHub releases"
+        },
+        {
+          "text": "Show changelog if update available"
+        },
+        {
+          "text": "Optional: auto-check on startup (weekly)"
+        }
+      ],
+      "technicalNotes": "```python\nimport requests\n\ndef check_updates():\n    current = __version__\n    response = requests.get(\n        \"https://api.github.com/repos/user/rejoice-v2/releases/latest\"\n    )\n    latest = response.json()['tag_name']\n\n    if latest > current:\n        console.print(f\"Update available: {current} -> {latest}\")\n```",
+      "testRequirements": "- Test version display\n- Test update check\n- Test with no internet\n- Test changelog display"
+    },
+    {
+      "id": "S-010",
+      "code": "S-010",
+      "phaseId": "7",
+      "title": "Debug Mode",
+      "priority": "High",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want verbose output when troubleshooting so that I can understand what's happening.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec --debug <command>` enables debug mode"
+        },
+        {
+          "text": "Show all logging output"
+        },
+        {
+          "text": "Show API calls/responses"
+        },
+        {
+          "text": "Show file operations"
+        },
+        {
+          "text": "Show timing information"
+        },
+        {
+          "text": "Don't clear terminal output"
+        }
+      ],
+      "technicalNotes": "```python\nimport logging\n\nif debug:\n    logging.getLogger().setLevel(logging.DEBUG)\n    console.print(\"[yellow]Debug mode enabled[/yellow]\")\n```",
+      "testRequirements": "- Test debug output\n- Test with each command\n- Test logging levels\n- Test timing information"
+    },
+    {
+      "id": "I-001",
+      "code": "I-001",
+      "phaseId": "0",
+      "title": "Virtual Environment Setup",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want Rejoice installed in an isolated virtual environment so that it doesn't conflict with my system Python packages.",
+      "acceptanceCriteria": [
+        {
+          "text": "Create venv at `~/.rejoice/venv`"
+        },
+        {
+          "text": "Use system Python 3.8+"
+        },
+        {
+          "text": "Install all dependencies in venv"
+        },
+        {
+          "text": "Venv is completely isolated"
+        },
+        {
+          "text": "No system Python pollution"
+        },
+        {
+          "text": "Easy to delete (just remove `~/.rejoice/`)"
+        }
+      ],
+      "technicalNotes": "```bash\n# Create isolated environment\npython3 -m venv ~/.rejoice/venv\n\n# Activate and install\nsource ~/.rejoice/venv/bin/activate\npip install --upgrade pip\npip install rejoice\n\n# Venv structure:\n~/.rejoice/\n├── venv/\n│   ├── bin/\n│   │   ├── python\n│   │   ├── pip\n│   │   └── rec          # Entry point\n│   ├── lib/\n│   └── pyvenv.cfg\n└── config/\n    └── config.yaml\n```",
+      "testRequirements": "- Test venv creation\n- Test package installation in venv\n- Test isolation (no system packages accessible)\n- Test with different Python versions (3.8, 3.9, 3.10, 3.11)\n- Test on macOS and Linux"
+    },
+    {
+      "id": "I-002",
+      "code": "I-002",
+      "phaseId": "0",
+      "title": "Shell Alias Creation",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want to type `rec` from anywhere so that I don't need to remember the full path to the venv.",
+      "acceptanceCriteria": [
+        {
+          "text": "Detect user's shell (bash, zsh, fish)"
+        },
+        {
+          "text": "Add alias to appropriate rc file"
+        },
+        {
+          "text": "Alias: `alias rec=\"~/.rejoice/venv/bin/rec\"`"
+        },
+        {
+          "text": "Alias works immediately (source rc file)"
+        },
+        {
+          "text": "Handle multiple shell configurations"
+        },
+        {
+          "text": "Don't duplicate aliases on reinstall"
+        }
+      ],
+      "technicalNotes": "```bash\n# Detect shell\nSHELL_NAME=$(basename \"$SHELL\")\n\n# Add alias based on shell\ncase \"$SHELL_NAME\" in\n    bash)\n        RC_FILE=\"$HOME/.bashrc\"\n        ;;\n    zsh)\n        RC_FILE=\"$HOME/.zshrc\"\n        ;;\n    fish)\n        RC_FILE=\"$HOME/.config/fish/config.fish\"\n        ALIAS_CMD=\"alias rec='~/.rejoice/venv/bin/rec'\"\n        ;;\nesac\n\n# Check if alias already exists\nif ! grep -q \"alias rec=\" \"$RC_FILE\" 2>/dev/null; then\n    echo \"\" >> \"$RC_FILE\"\n    echo \"# Rejoice voice transcription\" >> \"$RC_FILE\"\n    echo \"alias rec='~/.rejoice/venv/bin/rec'\" >> \"$RC_FILE\"\n    echo \"✅ Added 'rec' alias to $RC_FILE\"\nfi\n\n# Source immediately for current session\nsource \"$RC_FILE\" 2>/dev/null || echo \"Please run: source $RC_FILE\"\n```\n\n**Shell-Specific Considerations:**\n- **Bash:** Use `~/.bashrc` (or `~/.bash_profile` on macOS)\n- **Zsh:** Use `~/.zshrc` (default on modern macOS)\n- **Fish:** Use `~/.config/fish/config.fish`, different syntax\n- **Tcsh/Csh:** Use `~/.cshrc`, different alias syntax",
+      "testRequirements": "- Test on bash\n- Test on zsh (macOS default)\n- Test on fish\n- Test alias immediately available after install\n- Test `rec` works from any directory\n- Test reinstall doesn't duplicate aliases\n- Test manual activation: `source ~/.bashrc`"
+    },
+    {
+      "id": "I-003",
+      "code": "I-003",
+      "phaseId": "0",
+      "title": "Alias Activation & Path Resolution",
+      "priority": "Critical",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want the `rec` command to automatically activate the virtual environment so that I don't have to think about it.",
+      "acceptanceCriteria": [
+        {
+          "text": "Alias directly calls venv Python"
+        },
+        {
+          "text": "No manual activation needed"
+        },
+        {
+          "text": "Works from any directory"
+        },
+        {
+          "text": "Expands `~` correctly in alias"
+        },
+        {
+          "text": "Handles spaces in paths"
+        }
+      ],
+      "technicalNotes": "```bash\n# Option 1: Direct venv call (recommended)\nalias rec=\"~/.rejoice/venv/bin/rec\"\n\n# Option 2: Wrapper script (if needed)\n# ~/.rejoice/rec-wrapper.sh\n#!/bin/bash\nsource ~/.rejoice/venv/bin/activate\nrec \"$@\"\ndeactivate\n\n# Then alias:\nalias rec=\"~/.rejoice/rec-wrapper.sh\"\n```\n\n**Why Direct Call is Better:**\n- No activation/deactivation overhead\n- Faster (instant startup)\n- Simpler (fewer moving parts)\n- Cleaner (no shell state changes)",
+      "testRequirements": "- Test `rec` from home directory\n- Test `rec` from any other directory\n- Test with paths containing spaces\n- Test `rec` passes arguments correctly\n- Test no activation messages appear"
+    },
+    {
+      "id": "I-004",
+      "code": "I-004",
+      "phaseId": "0",
+      "title": "Installation Script (Full Integration)",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Done",
+      "releaseLevel": "MVP",
+      "userStory": "As a user, I want one-command installation so that setup is effortless.",
+      "acceptanceCriteria": [
+        {
+          "text": "`curl -sSL https://install.rejoice.ai | bash` works"
+        },
+        {
+          "text": "Installs system dependencies (portaudio, ffmpeg)"
+        },
+        {
+          "text": "Creates virtual environment"
+        },
+        {
+          "text": "Installs Python package in venv"
+        },
+        {
+          "text": "Sets up shell alias"
+        },
+        {
+          "text": "Creates config directory"
+        },
+        {
+          "text": "Downloads default Whisper model"
+        },
+        {
+          "text": "Runs first-time setup"
+        },
+        {
+          "text": "Tests installation"
+        },
+        {
+          "text": "Works on macOS and Linux"
+        }
+      ],
+      "technicalNotes": "```bash\n#!/bin/bash\n# install.sh - Complete installation script\n\nset -e  # Exit on error\n\necho \"🎙️  Installing Rejoice...\"\n\n# 1. Detect OS\nOS=\"$(uname -s)\"\ncase \"$OS\" in\n    Darwin)\n        echo \"📦 Installing system dependencies (macOS)...\"\n        if ! command -v brew &> /dev/null; then\n            echo \"❌ Homebrew required. Install from https://brew.sh\"\n            exit 1\n        fi\n        brew install portaudio ffmpeg\n        ;;\n    Linux)\n        echo \"📦 Installing system dependencies (Linux)...\"\n        if command -v apt-get &> /dev/null; then\n            sudo apt-get update\n            sudo apt-get install -y portaudio19-dev ffmpeg\n        elif command -v dnf &> /dev/null; then\n            sudo dnf install -y portaudio-devel ffmpeg\n        else\n            echo \"❌ Unsupported package manager\"\n            exit 1\n        fi\n        ;;\n    *)\n        echo \"❌ Unsupported OS: $OS\"\n        exit 1\n        ;;\nesac\n\n# 2. Check Python version\nPYTHON_VERSION=$(python3 --version | awk '{print $2}')\necho \"🐍 Python version: $PYTHON_VERSION\"\n\n# 3. Create directory structure\necho \"📁 Creating directory structure...\"\nmkdir -p ~/.rejoice\nmkdir -p ~/.rejoice/config\nmkdir -p ~/.rejoice/logs\n\n# 4. Create virtual environment\necho \"🔧 Creating virtual environment...\"\npython3 -m venv ~/.rejoice/venv\n\n# 5. Install package\necho \"📦 Installing Rejoice...\"\n~/.rejoice/venv/bin/pip install --upgrade pip\n~/.rejoice/venv/bin/pip install rejoice\n\n# 6. Set up shell alias\necho \"⚙️  Setting up shell alias...\"\nSHELL_NAME=$(basename \"$SHELL\")\ncase \"$SHELL_NAME\" in\n    bash)\n        RC_FILE=\"$HOME/.bashrc\"\n        [[ \"$OS\" == \"Darwin\" ]] && RC_FILE=\"$HOME/.bash_profile\"\n        ;;\n    zsh)\n        RC_FILE=\"$HOME/.zshrc\"\n        ;;\n    fish)\n        RC_FILE=\"$HOME/.config/fish/config.fish\"\n        ;;\n    *)\n        RC_FILE=\"$HOME/.bashrc\"\n        ;;\nesac\n\n# Add alias if not exists\nif ! grep -q \"alias rec=\" \"$RC_FILE\" 2>/dev/null; then\n    echo \"\" >> \"$RC_FILE\"\n    echo \"# Rejoice - Voice Transcription\" >> \"$RC_FILE\"\n    echo \"alias rec=\\\"\\$HOME/.rejoice/venv/bin/rec\\\"\" >> \"$RC_FILE\"\n    echo \"✅ Added 'rec' command to $RC_FILE\"\nelse\n    echo \"✅ 'rec' command already configured\"\nfi\n\n# 7. Test installation\necho \"🧪 Testing installation...\"\nif ~/.rejoice/venv/bin/rec --version &> /dev/null; then\n    echo \"✅ Installation successful!\"\nelse\n    echo \"❌ Installation test failed\"\n    exit 1\nfi\n\n# 8. Instructions\necho \"\"\necho \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\"\necho \"✅ Rejoice installed successfully!\"\necho \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\"\necho \"\"\necho \"📝 To activate in current shell:\"\necho \"   source $RC_FILE\"\necho \"\"\necho \"🎙️  To start recording:\"\necho \"   rec\"\necho \"\"\necho \"💡 First time? Run setup:\"\necho \"   rec settings\"\necho \"\"\necho \"📚 For help:\"\necho \"   rec --help\"\necho \"\"\n```",
+      "testRequirements": "- Test on fresh macOS (Intel & Apple Silicon)\n- Test on fresh Linux (Ubuntu 20.04, 22.04, Debian)\n- Test with bash\n- Test with zsh\n- Test with existing Python installations\n- Test system dependency installation\n- Test venv creation\n- Test alias creation\n- Test with `rec` immediately after install\n- Test with new shell session after install"
+    },
+    {
+      "id": "I-005",
+      "code": "I-005",
+      "phaseId": "0",
+      "title": "Uninstallation Script",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MMP",
+      "userStory": "As a user, I want to uninstallation script",
+      "acceptanceCriteria": []
+    },
+    {
+      "id": "I-006",
+      "code": "I-006",
+      "phaseId": "0",
+      "title": "Uninstallation Script",
+      "priority": "Medium",
+      "estimate": "S",
+      "status": "Done",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want clean uninstallation so that Rejoice doesn't leave system pollution.",
+      "acceptanceCriteria": [
+        {
+          "text": "`rec uninstall` removes everything"
+        },
+        {
+          "text": "Remove virtual environment"
+        },
+        {
+          "text": "Remove config directory (with confirmation)"
+        },
+        {
+          "text": "Remove command aliases"
+        },
+        {
+          "text": "Optionally keep transcripts"
+        },
+        {
+          "text": "Confirmation prompts"
+        }
+      ],
+      "technicalNotes": "```bash\n#!/bin/bash\n# Included in package\n\necho \"This will remove Rejoice from your system.\"\necho \"Your transcripts will NOT be deleted.\"\nread -p \"Continue? (y/n) \" -n 1 -r\n\nif [[ $REPLY =~ ^[Yy]$ ]]; then\n    rm -rf ~/.rejoice\n    # Remove alias from shell rc\nfi\n```",
+      "testRequirements": "- Test complete removal\n- Test transcript preservation\n- Test on different systems"
+    },
+    {
+      "id": "I-007",
+      "code": "I-007",
+      "phaseId": "0",
+      "title": "First-Run Setup",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a new user, I want guided setup so that Rejoice is configured correctly on first use.",
+      "acceptanceCriteria": [
+        {
+          "text": "Detect first run (no config file)"
+        },
+        {
+          "text": "Welcome message"
+        },
+        {
+          "text": "Test microphone"
+        },
+        {
+          "text": "Choose save location"
+        },
+        {
+          "text": "Download default Whisper model"
+        },
+        {
+          "text": "Test Ollama (optional)"
+        },
+        {
+          "text": "Create sample transcript"
+        }
+      ],
+      "technicalNotes": "```python\ndef first_run_setup():\n    console.print(Panel(\"👋 Welcome to Rejoice!\"))\n\n    # 1. Microphone\n    console.print(\"\\n1️⃣ Let's test your microphone...\")\n    test_microphone()\n\n    # 2. Save location\n    console.print(\"\\n2️⃣ Where should transcripts be saved?\")\n    save_path = setup_save_location()\n\n    # 3. Model\n    console.print(\"\\n3️⃣ Downloading transcription model...\")\n    download_model('base')\n\n    # 4. Done\n    console.print(\"\\n✅ Setup complete! Type 'rec' to start.\")\n```",
+      "testRequirements": "- Test full setup flow\n- Test partial setup (user cancels)\n- Test setup skip option\n- Test on fresh install"
+    },
+    {
+      "id": "I-008",
+      "code": "I-008",
+      "phaseId": "0",
+      "title": "Documentation Generation",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user/developer, I want comprehensive documentation so that I can learn and contribute effectively.",
+      "acceptanceCriteria": [],
+      "testRequirements": "- Review documentation completeness\n- Test all examples work\n- Verify code samples are correct"
+    },
+    {
+      "id": "I-009",
+      "code": "I-009",
+      "phaseId": "0",
+      "title": "CI/CD Pipeline",
+      "priority": "High",
+      "estimate": "L",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a developer, I want automated testing so that code quality is maintained.",
+      "acceptanceCriteria": [
+        {
+          "text": "GitHub Actions workflow configured"
+        },
+        {
+          "text": "Run tests on push"
+        },
+        {
+          "text": "Run tests on PR"
+        },
+        {
+          "text": "Test multiple Python versions (3.8-3.11)"
+        },
+        {
+          "text": "Test on multiple OS (Ubuntu, macOS)"
+        },
+        {
+          "text": "Coverage reporting"
+        },
+        {
+          "text": "Automated releases"
+        }
+      ],
+      "technicalNotes": "```yaml\n# .github/workflows/test.yml\nname: Tests\n\non: [push, pull_request]\n\njobs:\n  test:\n    runs-on: ${{ matrix.os }}\n    strategy:\n      matrix:\n        os: [ubuntu-latest, macos-latest]\n        python-version: ['3.8', '3.9', '3.10', '3.11']\n\n    steps:\n      - uses: actions/checkout@v3\n      - name: Set up Python\n        uses: actions/setup-python@v4\n        with:\n          python-version: ${{ matrix.python-version }}\n      - name: Install dependencies\n        run: pip install -e \".[dev]\"\n      - name: Run tests\n        run: pytest --cov\n```",
+      "testRequirements": "- Test CI runs successfully\n- Test on all matrix combinations\n- Test coverage reporting"
+    },
+    {
+      "id": "P-001",
+      "code": "P-001",
+      "phaseId": "8",
+      "title": "Performance Optimization",
+      "priority": "Medium",
+      "estimate": "L",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want fast startup and transcription so that Rejoice feels responsive.",
+      "acceptanceCriteria": [
+        {
+          "text": "Cold start < 5 seconds"
+        },
+        {
+          "text": "Warm start < 1 second"
+        },
+        {
+          "text": "Model preloading (optional)"
+        },
+        {
+          "text": "Optimize imports"
+        },
+        {
+          "text": "Lazy loading where possible"
+        }
+      ],
+      "technicalNotes": "```python\n# Lazy imports\ndef record():\n    # Import heavy dependencies only when needed\n    from .transcription import Transcriber\n    transcriber = Transcriber()\n```",
+      "testRequirements": "- Benchmark startup time\n- Profile code for bottlenecks\n- Test with/without model preload"
+    },
+    {
+      "id": "P-002",
+      "code": "P-002",
+      "phaseId": "8",
+      "title": "Error Handling Improvements",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want helpful error messages so that I can fix problems easily.",
+      "acceptanceCriteria": [
+        {
+          "text": "All errors caught gracefully"
+        },
+        {
+          "text": "Clear, friendly error messages"
+        },
+        {
+          "text": "Suggestions for fixes"
+        },
+        {
+          "text": "No stack traces in normal mode"
+        },
+        {
+          "text": "Stack traces in debug mode"
+        },
+        {
+          "text": "Exit codes defined"
+        }
+      ],
+      "technicalNotes": "```python\nclass RejoiceError(Exception):\n    \"\"\"Base exception\"\"\"\n    def __init__(self, message, suggestion=None):\n        self.message = message\n        self.suggestion = suggestion\n\ntry:\n    # ... operation\nexcept FileNotFoundError:\n    raise RejoiceError(\n        \"Recording not found\",\n        suggestion=\"Try 'rec list' to see available recordings\"\n    )\n```",
+      "testRequirements": "- Test all error paths\n- Test error message quality\n- Test debug vs normal mode\n- Test exit codes"
+    },
+    {
+      "id": "P-003",
+      "code": "P-003",
+      "phaseId": "8",
+      "title": "Progress Indicators",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to see progress so that I know operations haven't frozen.",
+      "acceptanceCriteria": [
+        {
+          "text": "Spinners for short operations"
+        },
+        {
+          "text": "Progress bars for long operations"
+        },
+        {
+          "text": "ETA for transcription"
+        },
+        {
+          "text": "Live updates don't flicker"
+        },
+        {
+          "text": "Clean, minimal design"
+        }
+      ],
+      "technicalNotes": "```python\nfrom rich.progress import Progress\n\nwith Progress() as progress:\n    task = progress.add_task(\"Transcribing...\", total=100)\n    for chunk in transcribe():\n        progress.update(task, advance=1)\n```",
+      "testRequirements": "- Test all progress indicators\n- Test with various durations\n- Test cancellation during progress"
+    },
+    {
+      "id": "P-004",
+      "code": "P-004",
+      "phaseId": "8",
+      "title": "Success Messaging",
+      "priority": "Low",
+      "estimate": "S",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want confirmation of success so that I know operations completed.",
+      "acceptanceCriteria": [
+        {
+          "text": "Success messages for all commands"
+        },
+        {
+          "text": "Show file location after recording"
+        },
+        {
+          "text": "Show next steps"
+        },
+        {
+          "text": "Consistent messaging style"
+        },
+        {
+          "text": "Optional: celebrations for milestones"
+        }
+      ],
+      "technicalNotes": "```python\ndef show_success(filepath, transcript_id):\n    console.print(\"\\n✅ Transcription saved!\\n\")\n    console.print(f\"📄 File: {filepath.name}\")\n    console.print(f\"🆔 ID: {transcript_id}\")\n    console.print(\"\\n💡 What's next?\")\n    console.print(f\"   • View it:    rec view {transcript_id}\")\n    console.print(f\"   • Analyze it: rec analyze {transcript_id}\")\n```",
+      "testRequirements": "- Test all success messages\n- Test message consistency\n- Test milestone celebrations"
+    },
+    {
+      "id": "P-005",
+      "code": "P-005",
+      "phaseId": "8",
+      "title": "Tab Completion",
+      "priority": "Low",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want tab completion so that commands are faster to type.",
+      "acceptanceCriteria": [
+        {
+          "text": "Bash completion script"
+        },
+        {
+          "text": "Zsh completion script"
+        },
+        {
+          "text": "Complete commands: `rec <TAB>`"
+        },
+        {
+          "text": "Complete IDs: `rec view <TAB>`"
+        },
+        {
+          "text": "Complete file paths"
+        }
+      ],
+      "technicalNotes": "```bash\n# bash completion\n_rec_completions()\n{\n    local cur=${COMP_WORDS[COMP_CWORD]}\n    COMPREPLY=( $(compgen -W \"record list view analyze delete\" -- $cur) )\n}\ncomplete -F _rec_completions rec\n```",
+      "testRequirements": "- Test bash completion\n- Test zsh completion\n- Test command completion\n- Test ID completion"
+    },
+    {
+      "id": "P-006",
+      "code": "P-006",
+      "phaseId": "8",
+      "title": "User Acceptance Testing",
+      "priority": "Critical",
+      "estimate": "XL",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As the project team, we want real users to test Rejoice so that we catch issues before release.",
+      "acceptanceCriteria": [],
+      "testRequirements": "- Create testing guide\n- Set up feedback collection\n- Track and prioritize issues\n- Verify fixes"
+    },
+    {
+      "id": "P-007",
+      "code": "P-007",
+      "phaseId": "8",
+      "title": "Performance Benchmarking",
+      "priority": "Medium",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a developer, I want performance metrics so that we can track improvements over time.",
+      "acceptanceCriteria": [
+        {
+          "text": "Benchmark suite created"
+        },
+        {
+          "text": "Startup time measured"
+        },
+        {
+          "text": "Transcription speed measured"
+        },
+        {
+          "text": "Memory usage tracked"
+        },
+        {
+          "text": "Baseline established"
+        },
+        {
+          "text": "Regression detection"
+        }
+      ],
+      "technicalNotes": "```python\n# tests/performance/benchmarks.py\n\ndef test_startup_time():\n    start = time.time()\n    subprocess.run(['rec', '--version'])\n    duration = time.time() - start\n    assert duration < 5.0  # Must start in < 5s\n\ndef test_transcription_speed():\n    # 60s audio should transcribe in < 60s (faster than realtime)\n    start = time.time()\n    transcribe('tests/fixtures/audio/speech_60s.wav')\n    duration = time.time() - start\n    assert duration < 60.0\n```",
+      "testRequirements": "- Run benchmarks on reference hardware\n- Track results over time\n- Set up performance CI"
+    },
+    {
+      "id": "P-008",
+      "code": "P-008",
+      "phaseId": "8",
+      "title": "Security Review",
+      "priority": "High",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As a user, I want to trust that Rejoice is secure so that my data is safe.",
+      "acceptanceCriteria": [
+        {
+          "text": "Code review for security issues"
+        },
+        {
+          "text": "No hard-coded credentials"
+        },
+        {
+          "text": "Secure file permissions"
+        },
+        {
+          "text": "Input validation everywhere"
+        },
+        {
+          "text": "Dependency security audit"
+        },
+        {
+          "text": "Privacy policy clear"
+        }
+      ],
+      "technicalNotes": "- Use `bandit` for Python security linting\n- Use `safety` for dependency vulnerabilities\n- Review file operations for path traversal\n- Validate all user inputs",
+      "testRequirements": "- Run security scanners\n- Fix all high/critical issues\n- Document security practices"
+    },
+    {
+      "id": "P-009",
+      "code": "P-009",
+      "phaseId": "8",
+      "title": "Release Preparation",
+      "priority": "Critical",
+      "estimate": "L",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As the project team, we want a smooth release so that users can start using Rejoice.",
+      "acceptanceCriteria": [
+        {
+          "text": "Version number finalized (2.0.0)"
+        },
+        {
+          "text": "CHANGELOG.md complete"
+        },
+        {
+          "text": "All documentation reviewed"
+        },
+        {
+          "text": "README polished"
+        },
+        {
+          "text": "Release notes written"
+        },
+        {
+          "text": "GitHub release created"
+        },
+        {
+          "text": "PyPI package published"
+        }
+      ],
+      "technicalNotes": "```bash\n# Release checklist\n- [ ] All tests passing\n- [ ] Documentation complete\n- [ ] CHANGELOG updated\n- [ ] Version bumped\n- [ ] Git tag created\n- [ ] GitHub release published\n- [ ] PyPI package uploaded\n- [ ] Announcement written\n```",
+      "testRequirements": "- Test installation from PyPI\n- Test on fresh systems\n- Verify all docs links work"
+    },
+    {
+      "id": "P-010",
+      "code": "P-010",
+      "phaseId": "8",
+      "title": "Launch & Announcement",
+      "priority": "Critical",
+      "estimate": "M",
+      "status": "Backlog",
+      "releaseLevel": "MLP",
+      "userStory": "As the project team, we want to announce Rejoice so that users can discover it.",
+      "acceptanceCriteria": [],
+      "testRequirements": "- Review all launch materials\n- Test demo scenarios\n- Verify links work"
+    }
+  ],
+  "prompts": {
+    "persona": "You are a development assistant helping build Rejoice Slim v2, a local-first voice transcription tool. Follow TDD principles, maintain data integrity, and respect the 'Slim' philosophy (no GUI, no cloud, minimal complexity).",
+    "guidelines": [
+      "Always write tests before implementation (TDD)",
+      "Ensure zero data loss - create files immediately, use atomic writes",
+      "Follow the Slim mandate - no GUI, no cloud, no databases",
+      "Maintain 90%+ test coverage",
+      "Respect configuration hierarchy: defaults < config file < env vars < CLI flags"
+    ]
+  }
+}

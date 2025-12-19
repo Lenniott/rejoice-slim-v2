@@ -23,6 +23,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented optional transcript deletion or safe cancellation by marking frontmatter status as `cancelled`, always cleaning up the audio stream.
   - Added CLI unit coverage for the cancel path to ensure status updates behave as expected.
 
+- [T-009] Connect Recording to Transcription
+  - Integrated automatic transcription into the recording workflow in `start_recording_session`.
+  - Audio captured during recording is saved to a temporary WAV file and automatically transcribed after recording stops.
+  - Transcription runs automatically and appends text to the transcript file using the `Transcriber.stream_file_to_transcript` method.
+  - Temporary audio files are cleaned up after transcription completes, even on errors.
+  - Transcription errors are handled gracefully without crashing the CLI.
+  - Cancelled recordings skip transcription entirely.
+  - Language override from `--language` CLI flag is passed through to the Transcriber.
+  - Added 6 comprehensive unit tests covering all acceptance criteria: audio saving, transcription execution, text appending, cleanup, error handling, cancellation skipping, and language flag passing.
+
+- [T-010] Real-Time Incremental Transcription During Recording
+  - Implemented `RealtimeTranscriptionWorker` class in `transcription/realtime.py` for incremental transcription during recording.
+  - Audio chunks are processed incrementally (every 1 second by default) while recording is in progress.
+  - Transcript file is updated in real-time as speech segments are transcribed and confirmed.
+  - Uses faster-whisper with chunked processing (alternative to whisper-streaming to maintain "slim" philosophy and avoid new dependencies).
+  - Thread-safe file writing ensures no corruption from concurrent transcription updates.
+  - Final transcription pass after recording stops catches any remaining audio not processed during real-time transcription.
+  - Transcription errors are handled gracefully without stopping recording.
+  - VAD support is provided via faster-whisper's built-in VAD filter.
+  - Integrated into `start_recording_session` to enable real-time transcription by default.
+  - Added 6 unit tests covering incremental updates, thread safety, error handling, final pass, chunk size, and VAD integration.
+
 ### Changed
 
 - [T-002] Language Detection & Control

@@ -792,14 +792,18 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
     def fake_wait_for_stop() -> None:
         pass
 
-    # Mock Transcriber
+    # Mock Transcriber with transcribe_file for real-time worker
     class FakeTranscriber:
         def __init__(self, config):
             events.append(("transcriber_init", config.language))
 
+        def transcribe_file(self, audio_path):
+            events.append(("transcribe_file", audio_path))
+            # Yield a dummy segment
+            yield {"text": "Hello world", "start": 0.0, "end": 1.0}
+
         def stream_file_to_transcript(self, audio_path, transcript_path):
             events.append(("transcribe", audio_path, transcript_path))
-            # Yield a dummy segment
             yield {"text": "Hello world", "start": 0.0, "end": 1.0}
 
     monkeypatch.setattr(
@@ -817,6 +821,28 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.Transcriber",
         FakeTranscriber,
+    )
+
+    # Mock RealtimeTranscriptionWorker to track finalize calls
+    class FakeRealtimeWorker:
+        def __init__(self, *args, **kwargs):
+            events.append("realtime_worker_init")
+
+        def start(self):
+            events.append("realtime_worker_start")
+
+        def stop(self, timeout=None):
+            events.append("realtime_worker_stop")
+
+        def add_audio_chunk(self, chunk):
+            pass
+
+        def finalize(self, remaining_audio_path=None):
+            events.append(("realtime_finalize", remaining_audio_path))
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.RealtimeTranscriptionWorker",
+        FakeRealtimeWorker,
     )
 
     # Mock tempfile and wave
@@ -877,8 +903,13 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
 
     start_recording_session(wait_for_stop=fake_wait_for_stop)
 
-    # Verify transcription was called
-    assert any(event[0] == "transcribe" for event in events if isinstance(event, tuple))
+    # Verify real-time transcription worker was initialized and finalize was called
+    assert "realtime_worker_init" in events
+    assert "realtime_worker_start" in events
+    assert "realtime_worker_stop" in events
+    assert any(
+        event[0] == "realtime_finalize" for event in events if isinstance(event, tuple)
+    )
 
 
 def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
@@ -917,15 +948,24 @@ def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
     def fake_wait_for_stop() -> None:
         pass
 
-    # Mock Transcriber that yields segments and actually appends them
+    # Mock Transcriber that yields segments for real-time worker
     from rejoice.transcript.manager import append_to_transcript
 
     class FakeTranscriber:
         def __init__(self, config):
             pass
 
+        def transcribe_file(self, audio_path):
+            # Yield segments for real-time worker (used in finalize)
+            segments = [
+                {"text": "First segment", "start": 0.0, "end": 1.0},
+                {"text": "Second segment", "start": 1.0, "end": 2.0},
+            ]
+            for segment in segments:
+                yield segment
+
         def stream_file_to_transcript(self, audio_path, transcript_path):
-            # Yield segments and append them (mimicking real behavior)
+            # Not used in real-time transcription, but kept for compatibility
             segments = [
                 {"text": "First segment", "start": 0.0, "end": 1.0},
                 {"text": "Second segment", "start": 1.0, "end": 2.0},
@@ -955,6 +995,36 @@ def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.Transcriber",
         FakeTranscriber,
+    )
+
+    # Mock RealtimeTranscriptionWorker to actually append text during finalize
+    class FakeRealtimeWorker:
+        def __init__(self, transcriber, transcript_path, **kwargs):
+            self.transcriber = transcriber
+            self.transcript_path = transcript_path
+
+        def start(self):
+            pass
+
+        def stop(self, timeout=None):
+            pass
+
+        def add_audio_chunk(self, chunk):
+            pass
+
+        def finalize(self, remaining_audio_path=None):
+            # Actually call transcribe_file and append segments
+            if remaining_audio_path:
+                for segment in self.transcriber.transcribe_file(
+                    str(remaining_audio_path)
+                ):
+                    text = str(segment.get("text", "")).strip()
+                    if text:
+                        append_to_transcript(self.transcript_path, text)
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.RealtimeTranscriptionWorker",
+        FakeRealtimeWorker,
     )
 
     # Mock tempfile and wave
@@ -1315,6 +1385,10 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
         def __init__(self, config):
             events.append("transcriber_init")
 
+        def transcribe_file(self, audio_path):
+            events.append("transcribe_file_called")
+            yield {"text": "Should not appear", "start": 0.0, "end": 1.0}
+
         def stream_file_to_transcript(self, audio_path, transcript_path):
             events.append("transcribe_called")
             yield {"text": "Should not appear", "start": 0.0, "end": 1.0}
@@ -1342,6 +1416,30 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.Confirm.ask",
         lambda *args, **kwargs: True,  # Confirm cancellation
+    )
+
+    # Mock RealtimeTranscriptionWorker - initialized but finalize won't be called
+    class FakeRealtimeWorker:
+        def __init__(self, *args, **kwargs):
+            # Worker is initialized even for cancelled recordings
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self, timeout=None):
+            pass
+
+        def add_audio_chunk(self, chunk):
+            pass
+
+        def finalize(self, remaining_audio_path=None):
+            # This should NOT be called for cancelled recordings
+            events.append("realtime_finalize_called")
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.RealtimeTranscriptionWorker",
+        FakeRealtimeWorker,
     )
 
     import tempfile
@@ -1387,9 +1485,13 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
 
     start_recording_session(wait_for_stop=fake_wait_for_stop)
 
-    # Verify transcription was NOT called
-    assert "transcriber_init" not in events
+    # For cancelled recordings:
+    # - Transcriber is initialized (for real-time worker), but that's okay
+    # - Final transcription pass (finalize) should NOT be called
+    # - stream_file_to_transcript should NOT be called
     assert "transcribe_called" not in events
+    assert "transcribe_file_called" not in events
+    assert "realtime_finalize_called" not in events
 
 
 def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):

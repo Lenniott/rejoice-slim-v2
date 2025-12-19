@@ -19,8 +19,9 @@ from rejoice.audio import record_audio
 from rejoice.cli.config_commands import config_group
 from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
-from rejoice.exceptions import TranscriptionError, TranscriptError
+from rejoice.exceptions import TranscriptError
 from rejoice.transcription import Transcriber
+from rejoice.transcription.realtime import RealtimeTranscriptionWorker
 from rejoice.transcript.manager import (
     TRANSCRIPT_FILENAME_PATTERN,
     create_transcript,
@@ -53,18 +54,21 @@ def start_recording_session(
     wait_for_stop=_default_wait_for_stop,
     language_override: Optional[str] = None,
 ):
-    """Start a recording session implementing [R-006] Recording Control - Start
-    and [T-009] Connect Recording to Transcription.
+    """Start a recording session implementing [R-006] Recording Control - Start,
+    [T-009] Connect Recording to Transcription, and [T-010] Real-Time Incremental
+    Transcription During Recording.
 
     Steps:
     - Load configuration
     - Immediately create a transcript file (zero data loss)
     - Create temporary WAV file for audio capture
+    - Initialize real-time transcription worker
     - Start audio capture using the configured device and sample rate
-    - Write audio data to temporary WAV file during recording
+    - Write audio data to temporary WAV file and feed to real-time transcription
     - Block until ``wait_for_stop`` returns
+    - Stop real-time transcription worker
     - Clean up the audio stream and display basic duration information
-    - If not cancelled, transcribe the temporary audio file
+    - If not cancelled, run final transcription pass on remaining audio
     - Clean up temporary audio file
 
     Args:
@@ -102,14 +106,28 @@ def start_recording_session(
     wav_file.setsampwidth(2)  # 16-bit
     wav_file.setframerate(config.audio.sample_rate)  # 16kHz
 
-    # 3. Start audio capture
+    # 3. Initialize real-time transcription worker [T-010]
+    transcriber = Transcriber(config.transcription)
+    realtime_worker = RealtimeTranscriptionWorker(
+        transcriber=transcriber,
+        transcript_path=filepath,
+        sample_rate=config.audio.sample_rate,
+        min_chunk_size_seconds=1.0,  # Process chunks every 1 second
+    )
+    realtime_worker.start()
+
+    # 4. Start audio capture
     start_time = time.time()
 
     def _audio_callback(indata, frames, timing, status):  # pragma: no cover
-        # Write audio buffer to WAV file
+        # Write audio buffer to WAV file (for final pass)
         # Convert float32 to int16 PCM
         audio_int16 = (indata * 32767).astype(np.int16)
         wav_file.writeframes(audio_int16.tobytes())
+
+        # Feed audio chunk to real-time transcription worker [T-010]
+        # Convert to float32 if needed (indata should already be float32)
+        realtime_worker.add_audio_chunk(indata.flatten())
 
     stream = record_audio(
         _audio_callback,
@@ -121,7 +139,7 @@ def start_recording_session(
     cancelled = False
 
     try:
-        # 4. Wait for stop signal (keypress)
+        # 5. Wait for stop signal (keypress)
         try:
             wait_for_stop()
         except KeyboardInterrupt:
@@ -138,7 +156,10 @@ def start_recording_session(
             ):
                 cancelled = False
     finally:
-        # 5. Clean up audio stream and WAV file
+        # 6. Stop real-time transcription worker [T-010]
+        realtime_worker.stop(timeout=5.0)
+
+        # 7. Clean up audio stream and WAV file
         try:
             stream.stop()
             stream.close()
@@ -185,28 +206,23 @@ def start_recording_session(
         except Exception:  # pragma: no cover - defensive cleanup
             pass
     else:
-        # 6. Finalise the transcript frontmatter to reflect a completed recording.
+        # 8. Finalise the transcript frontmatter to reflect a completed recording.
         update_status(filepath, "completed")
         console.print(
             "\n✅ Recording stopped. Transcript marked as [bold]completed[/bold].",
         )
 
-        # 7. Transcribe the audio file [T-009]
+        # 9. Run final transcription pass on remaining audio [T-010]
+        # This catches any audio that wasn't processed by real-time worker
         try:
-            console.print("🔄 Transcribing audio...")
-            transcriber = Transcriber(config.transcription)
-            # Consume the generator to trigger transcription and file appends
-            list(transcriber.stream_file_to_transcript(str(temp_audio_path), filepath))
-            console.print("✅ Transcription complete.")
-        except TranscriptionError as e:
-            # Handle transcription errors gracefully without crashing
-            console.print(f"[yellow]Transcription failed: {e}[/yellow]")
-            if e.suggestion:
-                console.print(f"[dim]{e.suggestion}[/dim]")
+            console.print("🔄 Running final transcription pass...")
+            realtime_worker.finalize(remaining_audio_path=temp_audio_path)
+            console.print("✅ Final transcription pass complete.")
         except Exception as e:  # pragma: no cover - defensive error handling
-            # Catch any other unexpected errors during transcription
+            # Log error but don't crash - real-time transcription may have already
+            # processed most of the audio
             console.print(
-                f"[yellow]Unexpected error during transcription: {e}[/yellow]"
+                f"[yellow]Warning: Final transcription pass failed: {e}[/yellow]"
             )
         finally:
             # Always clean up temp audio file
