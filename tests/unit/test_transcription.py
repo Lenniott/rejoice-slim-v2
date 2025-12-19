@@ -315,3 +315,50 @@ def test_stream_file_to_transcript_updates_language_in_frontmatter(
 
     content = transcript_path.read_text(encoding="utf-8")
     assert "language: es" in content
+
+
+def test_transcriber_handles_dict_style_info(monkeypatch, tmp_path):
+    """GIVEN transcribe_file
+    WHEN info is a dict with language key
+    THEN language is extracted correctly (line 158)"""
+
+    class DummySegment:
+        def __init__(self, text: str, start: float, end: float):
+            self.text = text
+            self.start = start
+            self.end = end
+
+    class Info:
+        def __init__(self):
+            # Use dict-style access
+            self._data = {"language": "fr"}
+
+        def get(self, key, default=None):
+            return self._data.get(key, default)
+
+        def __contains__(self, key):
+            return key in self._data
+
+    class DummyModel:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def transcribe(self, *args, **kwargs):
+            segments = [DummySegment("Bonjour", 0.0, 1.0)]
+            info = Info()
+            return segments, info
+
+    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+
+    cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
+    transcriber = transcription.Transcriber(cfg)
+
+    # Test that dict-style info access works
+    audio_path = str(tmp_path / "test.wav")
+    # Create a dummy audio file
+    (tmp_path / "test.wav").write_bytes(b"dummy")
+
+    segments = list(transcriber.transcribe_file(audio_path))
+    assert len(segments) > 0
+    # Language should be detected from dict-style info
+    assert transcriber.last_language == "fr"

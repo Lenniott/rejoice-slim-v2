@@ -1,10 +1,14 @@
 """CLI commands for Rejoice."""
 from __future__ import annotations
 
+import tempfile
 import time
+import wave
 from pathlib import Path
+from typing import Optional
 
 import click
+import numpy as np
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.prompt import Confirm
@@ -15,7 +19,8 @@ from rejoice.audio import record_audio
 from rejoice.cli.config_commands import config_group
 from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
-from rejoice.exceptions import TranscriptError
+from rejoice.exceptions import TranscriptionError, TranscriptError
+from rejoice.transcription import Transcriber
 from rejoice.transcript.manager import (
     TRANSCRIPT_FILENAME_PATTERN,
     create_transcript,
@@ -39,20 +44,34 @@ def _default_wait_for_stop() -> None:
 def start_recording_session(
     *,
     wait_for_stop=_default_wait_for_stop,
+    language_override: Optional[str] = None,
 ):
-    """Start a recording session implementing [R-006] Recording Control - Start.
+    """Start a recording session implementing [R-006] Recording Control - Start
+    and [T-009] Connect Recording to Transcription.
 
     Steps:
     - Load configuration
     - Immediately create a transcript file (zero data loss)
+    - Create temporary WAV file for audio capture
     - Start audio capture using the configured device and sample rate
+    - Write audio data to temporary WAV file during recording
     - Block until ``wait_for_stop`` returns
-    - Clean up the audio stream and print a simple duration summary
+    - Clean up the audio stream and display basic duration information
+    - If not cancelled, transcribe the temporary audio file
+    - Clean up temporary audio file
+
+    Args:
+        wait_for_stop: Function to call to wait for recording stop signal.
+        language_override: Optional language code to override config (e.g., "en", "es").
 
     Returns:
         tuple[Path, str]: The transcript filepath and ID.
     """
     config = load_config()
+
+    # Override language if provided via CLI flag
+    if language_override:
+        config.transcription.language = language_override
 
     # 1. Create transcript file immediately (zero data loss principle)
     save_dir = Path(config.output.save_path).expanduser()
@@ -61,14 +80,29 @@ def start_recording_session(
     console.print(f"🎙️  Recording started [dim](ID {transcript_id})[/dim]")
     console.print(f"📄  Transcript: {filepath}")
 
-    # 2. Start audio capture
+    # 2. Create temporary audio file for recording
+    temp_audio_file = tempfile.NamedTemporaryFile(
+        suffix=".wav",
+        delete=False,
+        dir=str(save_dir),
+    )
+    temp_audio_path = Path(temp_audio_file.name)
+    temp_audio_file.close()
+
+    # Open WAV file for writing
+    wav_file = wave.open(str(temp_audio_path), "wb")
+    wav_file.setnchannels(1)  # mono
+    wav_file.setsampwidth(2)  # 16-bit
+    wav_file.setframerate(config.audio.sample_rate)  # 16kHz
+
+    # 3. Start audio capture
     start_time = time.time()
 
     def _audio_callback(indata, frames, timing, status):  # pragma: no cover
-        # Placeholder for streaming/transcription pipeline in later stories.
-        # For now we simply discard audio blocks; the focus of [R-006] is the
-        # control flow and zero-data-loss transcript creation.
-        return
+        # Write audio buffer to WAV file
+        # Convert float32 to int16 PCM
+        audio_int16 = (indata * 32767).astype(np.int16)
+        wav_file.writeframes(audio_int16.tobytes())
 
     stream = record_audio(
         _audio_callback,
@@ -80,7 +114,7 @@ def start_recording_session(
     cancelled = False
 
     try:
-        # 3. Wait for stop signal (keypress)
+        # 4. Wait for stop signal (keypress)
         try:
             wait_for_stop()
         except KeyboardInterrupt:
@@ -97,13 +131,18 @@ def start_recording_session(
             ):
                 cancelled = False
     finally:
-        # 4. Clean up audio stream and display basic duration information
+        # 5. Clean up audio stream and WAV file
         try:
             stream.stop()
             stream.close()
         except Exception:  # pragma: no cover - defensive cleanup
             # Errors here are logged in the audio module; the CLI should not
             # crash during shutdown.
+            pass
+
+        try:
+            wav_file.close()
+        except Exception:  # pragma: no cover - defensive cleanup
             pass
 
         duration_seconds = int(time.time() - start_time)
@@ -133,12 +172,42 @@ def start_recording_session(
                 "\n⚠️  Recording cancelled. Transcript marked as "
                 "[bold]cancelled[/bold] and kept on disk.",
             )
+        # Clean up temp audio file for cancelled recordings
+        try:
+            temp_audio_path.unlink(missing_ok=True)
+        except Exception:  # pragma: no cover - defensive cleanup
+            pass
     else:
-        # 5. Finalise the transcript frontmatter to reflect a completed recording.
+        # 6. Finalise the transcript frontmatter to reflect a completed recording.
         update_status(filepath, "completed")
         console.print(
             "\n✅ Recording stopped. Transcript marked as [bold]completed[/bold].",
         )
+
+        # 7. Transcribe the audio file [T-009]
+        try:
+            console.print("🔄 Transcribing audio...")
+            transcriber = Transcriber(config.transcription)
+            # Consume the generator to trigger transcription and file appends
+            list(transcriber.stream_file_to_transcript(str(temp_audio_path), filepath))
+            console.print("✅ Transcription complete.")
+        except TranscriptionError as e:
+            # Handle transcription errors gracefully without crashing
+            console.print(f"[yellow]Transcription failed: {e}[/yellow]")
+            if e.suggestion:
+                console.print(f"[dim]{e.suggestion}[/dim]")
+        except Exception as e:  # pragma: no cover - defensive error handling
+            # Catch any other unexpected errors during transcription
+            console.print(
+                f"[yellow]Unexpected error during transcription: {e}[/yellow]"
+            )
+        finally:
+            # Always clean up temp audio file
+            try:
+                temp_audio_path.unlink(missing_ok=True)
+            except Exception:  # pragma: no cover - defensive cleanup
+                pass
+
         console.print(f"📄 File saved at: {filepath}")
 
     return filepath, transcript_id
@@ -261,7 +330,8 @@ def main(ctx, version, debug, language):
 
     # If no subcommand, start a recording session
     if ctx.invoked_subcommand is None:
-        start_recording_session()
+        language_override = ctx.obj.get("language") if ctx.obj else None
+        start_recording_session(language_override=language_override)
 
 
 @main.command("list")

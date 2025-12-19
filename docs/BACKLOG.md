@@ -32,8 +32,9 @@ These priority tiers sit **above phases**. When choosing what to work on next:
   - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ✅ [R-008]
 - Core transcription:
   - ✅ [T-001], ✅ [T-002], ✅ [T-003]
+  - ❌ [T-009] Connect Recording to Transcription
 - Core user commands:
-  - ✅ [C-001], ❌ [C-003]
+  - ✅ [C-001], ✅ [C-003]
 
 **MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
 
@@ -1075,6 +1076,87 @@ def streaming_transcription(audio_stream, transcript_file):
 - Test crash recovery (file has partial content)
 - Test with long recordings
 - Integration test full pipeline
+
+---
+
+### [T-009] Connect Recording to Transcription
+**Priority:** Critical
+**Estimate:** M (4-8h)
+**Status:** ❌ Not Started
+**Dependencies:** [R-006, T-001, T-003]
+
+**User Story:**
+As a user, I want my recorded audio to be automatically transcribed so that when I run `rec`, I get a transcript file with actual text, not just metadata.
+
+**Acceptance Criteria:**
+- [ ] Audio from recording callback is saved to a temporary file during recording
+- [ ] After recording stops, temporary audio file is passed to Transcriber
+- [ ] Transcription runs automatically and appends text to transcript file
+- [ ] Temporary audio file is cleaned up after transcription completes
+- [ ] Transcription errors are handled gracefully without crashing the CLI
+- [ ] Cancelled recordings skip transcription (no transcription attempted)
+- [ ] Language from CLI `--language` flag is passed to Transcriber when provided
+
+**Technical Notes:**
+```python
+import wave
+import tempfile
+from pathlib import Path
+
+def start_recording_session():
+    # ... existing transcript creation ...
+
+    # Create temporary audio file
+    temp_audio = tempfile.NamedTemporaryFile(
+        suffix='.wav',
+        delete=False,
+        dir=save_dir
+    )
+    temp_audio_path = Path(temp_audio.name)
+
+    # Audio callback writes to WAV file
+    wav_file = wave.open(str(temp_audio_path), 'wb')
+    wav_file.setnchannels(1)  # mono
+    wav_file.setsampwidth(2)   # 16-bit
+    wav_file.setframerate(16000)  # 16kHz
+
+    def _audio_callback(indata, frames, timing, status):
+        # Write audio buffer to WAV file
+        wav_file.writeframes(indata.tobytes())
+
+    stream = record_audio(_audio_callback, ...)
+
+    try:
+        wait_for_stop()
+    finally:
+        stream.stop()
+        stream.close()
+        wav_file.close()
+
+        # Transcribe if not cancelled
+        if not cancelled:
+            try:
+                transcriber = Transcriber(config.transcription)
+                list(transcriber.stream_file_to_transcript(
+                    str(temp_audio_path),
+                    filepath
+                ))
+            except TranscriptionError as e:
+                console.print(f"[yellow]Transcription failed: {e}[/yellow]")
+            finally:
+                # Always clean up temp file
+                temp_audio_path.unlink(missing_ok=True)
+```
+
+**Test Requirements:**
+- Test audio is saved correctly during recording
+- Test transcription runs after recording stops
+- Test transcript file contains transcribed text
+- Test temp file cleanup on success
+- Test temp file cleanup on error
+- Test cancellation skips transcription
+- Test language flag is passed through
+- Integration test full end-to-end flow
 
 ---
 

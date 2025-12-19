@@ -142,3 +142,30 @@ def test_record_audio_wraps_sounddevice_errors(monkeypatch):
         raise AssertionError(
             "record_audio() should wrap sounddevice errors in RuntimeError"
         )
+
+
+def test_get_audio_input_devices_handles_default_device_tuple(monkeypatch):
+    """GIVEN get_audio_input_devices
+    WHEN default.device is a tuple/list
+    THEN default_index is extracted correctly (line 50)"""
+    fake_devices = [
+        {"name": "Mic 1", "max_input_channels": 1, "index": 0},
+        {"name": "Mic 2", "max_input_channels": 1, "index": 1},
+    ]
+
+    # Mock sd.default.device as tuple (input, output)
+    mock_default = type("obj", (object,), {"device": (0, 1)})()
+    mock_sd = type(
+        "obj",
+        (object,),
+        {
+            "query_devices": lambda *args, **kwargs: fake_devices,
+            "default": mock_default,
+        },
+    )()
+
+    with patch("rejoice.audio.sd", mock_sd):
+        devices = get_audio_input_devices()
+
+    # First device should be marked as default
+    assert any(d["is_default"] for d in devices)

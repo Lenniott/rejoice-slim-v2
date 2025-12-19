@@ -156,6 +156,10 @@ class Transcriber:
                 detected_language = getattr(info, "language")
             elif isinstance(info, dict) and "language" in info:
                 detected_language = cast(Optional[str], info.get("language"))
+            elif hasattr(info, "get") and hasattr(info, "__contains__"):
+                # Support dict-like objects that aren't actually dicts
+                if "language" in info:
+                    detected_language = cast(Optional[str], info.get("language"))
 
         self._last_language = detected_language
 

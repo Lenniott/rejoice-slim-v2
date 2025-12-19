@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -383,3 +384,141 @@ def test_normalize_id_rejects_out_of_range_values():
 
         message = str(exc_info.value)
         assert "out of range" in message
+
+
+def test_get_next_id_returns_zero_when_directory_does_not_exist():
+    """GIVEN get_next_id
+    WHEN save_dir doesn't exist
+    THEN returns "000000" (line 83)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        nonexistent_dir = Path(tmpdir) / "nonexistent"
+        next_id = manager.get_next_id(nonexistent_dir)
+        assert next_id == "000000"
+
+
+def test_get_next_id_skips_non_files():
+    """GIVEN get_next_id
+    WHEN directory contains subdirectories
+    THEN subdirectories are skipped (line 89)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        # Create a subdirectory
+        subdir = save_dir / "subdir"
+        subdir.mkdir()
+        # Create a transcript file
+        (save_dir / "transcript_20250101_000001.md").write_text("test")
+
+        next_id = manager.get_next_id(save_dir)
+        assert next_id == "000002"
+
+
+def test_get_next_id_handles_invalid_id_strings():
+    """GIVEN get_next_id
+    WHEN filename has non-numeric ID
+    THEN ValueError is caught and entry is skipped (lines 98-99)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        # Create file with invalid ID
+        (save_dir / "transcript_20250101_invalid.md").write_text("test")
+        # Create valid file
+        (save_dir / "transcript_20250101_000005.md").write_text("test")
+
+        next_id = manager.get_next_id(save_dir)
+        assert next_id == "000006"
+
+
+def test_create_transcript_handles_collision_retry(monkeypatch):
+    """GIVEN create_transcript
+    WHEN filename collision occurs
+    THEN retries with next ID (lines 185-189)"""
+    from datetime import datetime
+
+    # Mock datetime.now() to return a fixed date so the test file matches
+    fixed_date = datetime(2025, 1, 1, 12, 0, 0)
+
+    # Create a mock datetime class that has now() returning fixed_date
+    # and can be used like the real datetime class
+    class MockDatetime:
+        @staticmethod
+        def now() -> datetime:
+            return fixed_date
+
+        @staticmethod
+        def strftime(date_obj: datetime, fmt: str) -> str:
+            return date_obj.strftime(fmt)
+
+    monkeypatch.setattr(manager, "datetime", MockDatetime)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        # Create a file that would cause collision (using the same date as mocked)
+        (save_dir / "transcript_20250101_000001.md").write_text("existing")
+
+        # Mock get_next_id to return same ID first time, then next
+        call_count = [0]
+
+        def mock_get_next_id(save_dir):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return "000001"  # Collision
+            return "000002"  # Next attempt
+
+        with patch.object(manager, "get_next_id", side_effect=mock_get_next_id):
+            filepath, tid = manager.create_transcript(save_dir)
+            assert tid == "000002"
+            assert filepath.exists()
+
+
+def test_append_to_transcript_handles_empty_body():
+    """GIVEN append_to_transcript
+    WHEN body is empty
+    THEN appends correctly (line 211)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = Path(tmpdir) / "transcript.md"
+        # Create file with frontmatter but empty body
+        content = "---\nid: '000001'\n---\n"
+        filepath.write_text(content)
+
+        manager.append_to_transcript(filepath, "new text")
+
+        result = filepath.read_text()
+        assert "new text" in result
+        assert result.startswith("---")
+
+
+def test_update_status_handles_missing_frontmatter():
+    """GIVEN update_status
+    WHEN file doesn't start with ---
+    THEN TranscriptError is raised (line 239)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = Path(tmpdir) / "transcript.md"
+        filepath.write_text("No frontmatter here")
+
+        with pytest.raises(manager.TranscriptError, match="missing YAML frontmatter"):
+            manager.update_status(filepath, "completed")
+
+
+def test_update_language_handles_missing_frontmatter():
+    """GIVEN update_language
+    WHEN file doesn't start with ---
+    THEN TranscriptError is raised (line 308)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = Path(tmpdir) / "transcript.md"
+        filepath.write_text("No frontmatter here")
+
+        with pytest.raises(manager.TranscriptError, match="missing YAML frontmatter"):
+            manager.update_language(filepath, "en")
+
+
+def test_update_language_handles_invalid_yaml():
+    """GIVEN update_language
+    WHEN frontmatter has invalid YAML
+    THEN TranscriptError is raised (line 336)"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = Path(tmpdir) / "transcript.md"
+        # Invalid YAML in frontmatter
+        content = "---\nid: '000001'\ninvalid: [unclosed\n---\nbody"
+        filepath.write_text(content)
+
+        with pytest.raises(manager.TranscriptError, match="invalid YAML"):
+            manager.update_language(filepath, "en")

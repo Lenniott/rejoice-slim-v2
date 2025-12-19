@@ -7,7 +7,9 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from rejoice.core.config import load_config
+from rejoice.core.config import (
+    load_config,
+)
 from rejoice.exceptions import ConfigError
 
 
@@ -170,3 +172,80 @@ def test_config_merges_partial_overrides():
             # Defaults still apply
             assert config.transcription.language == "auto"
             assert config.transcription.vad_filter is True
+
+
+def test_get_config_dir_uses_xdg_config_home(monkeypatch):
+    """GIVEN XDG_CONFIG_HOME environment variable is set
+    WHEN get_config_dir is called
+    THEN returns path using XDG_CONFIG_HOME (line 84)"""
+    from rejoice.core.config import get_config_dir
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv("XDG_CONFIG_HOME", tmpdir)
+        config_dir = get_config_dir()
+        assert str(config_dir) == str(Path(tmpdir) / "rejoice")
+
+
+def test_load_config_file_handles_yaml_error(monkeypatch):
+    """GIVEN config file with invalid YAML
+    WHEN load_config_file is called
+    THEN ConfigError is raised (lines 123-124)"""
+    from rejoice.core.config import load_config_file
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir)
+        config_file = config_dir / "config.yaml"
+        # Write invalid YAML
+        config_file.write_text("invalid: yaml: content: [unclosed")
+
+        with pytest.raises(ConfigError, match="Invalid YAML"):
+            load_config_file(config_dir)
+
+
+def test_load_env_overrides_loads_dotenv_file(monkeypatch, tmp_path):
+    """GIVEN .env file exists in config directory
+    WHEN load_env_overrides is called
+    THEN .env file is loaded (line 133)"""
+    from rejoice.core.config import load_env_overrides
+
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    env_file = config_dir / ".env"
+    env_file.write_text("REJOICE_TRANSCRIPTION_MODEL=large\n")
+
+    with patch("rejoice.core.config.get_config_dir", return_value=config_dir):
+        with patch("rejoice.core.config.load_dotenv") as mock_load_dotenv:
+            load_env_overrides()
+            mock_load_dotenv.assert_called_once_with(env_file)
+
+
+def test_load_env_overrides_converts_boolean_strings(monkeypatch):
+    """GIVEN environment variable with boolean string
+    WHEN load_env_overrides is called
+    THEN boolean string is converted to bool (line 162)"""
+    from rejoice.core.config import load_env_overrides
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".config" / "rejoice"
+        config_dir.mkdir(parents=True)
+
+        with patch("rejoice.core.config.get_config_dir", return_value=config_dir):
+            with patch.dict(os.environ, {"REJOICE_TRANSCRIPTION_VAD_FILTER": "false"}):
+                overrides = load_env_overrides()
+                assert overrides["transcription"]["vad_filter"] is False
+
+
+def test_load_env_overrides_converts_integer_strings(monkeypatch):
+    """GIVEN environment variable with integer string
+    WHEN load_env_overrides is called
+    THEN integer string is converted to int (line 164)"""
+    from rejoice.core.config import load_env_overrides
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".config" / "rejoice"
+        config_dir.mkdir(parents=True)
+
+        with patch("rejoice.core.config.get_config_dir", return_value=config_dir):
+            with patch.dict(os.environ, {"REJOICE_AUDIO_SAMPLE_RATE": "32000"}):
+                overrides = load_env_overrides()
+                assert overrides["audio"]["sample_rate"] == 32000

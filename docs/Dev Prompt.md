@@ -1,6 +1,3 @@
-**Use this prompt to continue building Rejoice Slim v2. This works for both starting fresh and picking up where you left off.**
-
----
 
 ## Your Mission
 

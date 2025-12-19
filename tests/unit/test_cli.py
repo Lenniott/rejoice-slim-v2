@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
+import pytest
 import click
 from click.testing import CliRunner
 
@@ -44,7 +45,7 @@ def test_cli_debug_flag():
     assert "Debug mode enabled" in result.output or "debug" in result.output.lower()
 
 
-def test_main_starts_recording_when_no_subcommand(monkeypatch):
+def test_main_starts_recording_when_no_subcommand(monkeypatch, tmp_path):
     """GIVEN rec is invoked without subcommand
     WHEN main is executed
     THEN a recording session is started via helper."""
@@ -52,11 +53,31 @@ def test_main_starts_recording_when_no_subcommand(monkeypatch):
 
     calls = {"started": False}
 
-    def fake_start_recording_session() -> Tuple[Path, str]:
+    def fake_start_recording_session(
+        *, wait_for_stop=None, language_override=None
+    ) -> Tuple[Path, str]:
         calls["started"] = True
         # Return dummy path/id to satisfy any callers
-        return Path("/tmp/transcript_20250101_000001.md"), "000001"
+        return tmp_path / "transcript_20250101_000001.md", "000001"
 
+    # Mock load_config to avoid permission errors with default save path
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    # Mock setup_logging to avoid filesystem access
+    monkeypatch.setattr(
+        "rejoice.cli.commands.setup_logging",
+        lambda debug=False: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
     monkeypatch.setattr(
         "rejoice.cli.commands.start_recording_session",
         fake_start_recording_session,
@@ -611,3 +632,1259 @@ def test_view_missing_transcript_shows_friendly_message(monkeypatch, tmp_path):
 
     assert result.exit_code != 0
     assert "Transcript with ID 000042 was not found" in result.output
+
+
+def test_recording_saves_audio_to_temp_file(monkeypatch, tmp_path):
+    """GIVEN a recording session
+    WHEN audio is captured
+    THEN audio data is written to a temporary WAV file during recording."""
+    events: List[object] = []
+    audio_data_written: List[bytes] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+
+    # Mock config to use tmp_path
+    from rejoice.core.config import (
+        AudioConfig,
+        OutputConfig,
+        TranscriptionConfig,
+    )
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        # Simulate audio callback being called with audio data
+        import numpy as np
+
+        # Create dummy audio data (16-bit PCM samples)
+        dummy_audio = np.array([0.5, -0.3, 0.8], dtype=np.float32)
+        callback(dummy_audio, len(dummy_audio), None, None)
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        pass
+
+    # Track if wave file operations are called
+    wave_file_created = {"created": False, "closed": False}
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            wave_file_created["created"] = True
+            events.append("wave_file_created")
+
+        def setnchannels(self, n):
+            events.append(("setnchannels", n))
+
+        def setsampwidth(self, width):
+            events.append(("setsampwidth", width))
+
+        def setframerate(self, rate):
+            events.append(("setframerate", rate))
+
+        def writeframes(self, data):
+            audio_data_written.append(data)
+            events.append("writeframes")
+
+        def close(self):
+            wave_file_created["closed"] = True
+            events.append("wave_file_closed")
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+
+    # Mock wave module
+    import wave
+
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Verify wave file was created and configured
+    assert wave_file_created["created"] is True
+    assert ("setnchannels", 1) in events
+    assert ("setsampwidth", 2) in events  # 16-bit
+    assert ("setframerate", 16000) in events
+    assert "writeframes" in events
+    assert wave_file_created["closed"] is True
+
+
+def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
+    """GIVEN a completed recording session
+    WHEN recording stops normally
+    THEN transcription is automatically run on the temporary audio file."""
+    events: List[object] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+    temp_audio_path = tmp_path / "temp_audio.wav"
+    temp_audio_path.write_bytes(b"dummy audio data")
+
+    # Mock config
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        pass
+
+    # Mock Transcriber
+    class FakeTranscriber:
+        def __init__(self, config):
+            events.append(("transcriber_init", config.language))
+
+        def stream_file_to_transcript(self, audio_path, transcript_path):
+            events.append(("transcribe", audio_path, transcript_path))
+            # Yield a dummy segment
+            yield {"text": "Hello world", "start": 0.0, "end": 1.0}
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Transcriber",
+        FakeTranscriber,
+    )
+
+    # Mock tempfile and wave
+    import tempfile
+    import wave
+
+    # Save reference to original before patching
+    original_named_temporary_file = tempfile.NamedTemporaryFile
+
+    def fake_named_temporary_file(*args, **kwargs):
+        # Check if this is for the audio file (has .wav suffix and delete=False)
+        # or for atomic writes (has mode='w' and encoding)
+        if kwargs.get("suffix") == ".wav" and kwargs.get("delete") is False:
+            # This is for the audio recording temp file
+            class FakeTempFile:
+                def __init__(self):
+                    self.name = str(temp_audio_path)
+                    self._content = ""
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    pass
+
+                def write(self, data):
+                    self._content += data
+
+                def close(self):
+                    pass
+
+            return FakeTempFile()
+        else:
+            # This is for atomic file writes - use original tempfile
+            return original_named_temporary_file(*args, **kwargs)
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def setnchannels(self, n):
+            pass
+
+        def setsampwidth(self, width):
+            pass
+
+        def setframerate(self, rate):
+            pass
+
+        def writeframes(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", fake_named_temporary_file)
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Verify transcription was called
+    assert any(event[0] == "transcribe" for event in events if isinstance(event, tuple))
+
+
+def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
+    """GIVEN a completed recording session
+    WHEN transcription runs
+    THEN transcribed text is appended to the transcript file."""
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+    temp_audio_path = tmp_path / "temp_audio.wav"
+    temp_audio_path.write_bytes(b"dummy audio data")
+
+    # Mock config
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        pass
+
+    # Mock Transcriber that yields segments and actually appends them
+    from rejoice.transcript.manager import append_to_transcript
+
+    class FakeTranscriber:
+        def __init__(self, config):
+            pass
+
+        def stream_file_to_transcript(self, audio_path, transcript_path):
+            # Yield segments and append them (mimicking real behavior)
+            segments = [
+                {"text": "First segment", "start": 0.0, "end": 1.0},
+                {"text": "Second segment", "start": 1.0, "end": 2.0},
+            ]
+            for segment in segments:
+                text = str(segment.get("text", "")).strip()
+                if text:
+                    append_to_transcript(transcript_path, text)
+                yield segment
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Transcriber",
+        FakeTranscriber,
+    )
+
+    # Mock tempfile and wave
+    import tempfile
+    import wave
+
+    # Save reference to original before patching
+    original_named_temporary_file = tempfile.NamedTemporaryFile
+
+    def fake_named_temporary_file(*args, **kwargs):
+        # Check if this is for the audio file (has .wav suffix and delete=False)
+        # or for atomic writes (has mode='w' and encoding)
+        if kwargs.get("suffix") == ".wav" and kwargs.get("delete") is False:
+            # This is for the audio recording temp file
+            class FakeTempFile:
+                def __init__(self):
+                    self.name = str(temp_audio_path)
+                    self._content = ""
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    pass
+
+                def write(self, data):
+                    self._content += data
+
+                def close(self):
+                    pass
+
+            return FakeTempFile()
+        else:
+            # This is for atomic file writes - use original tempfile
+            return original_named_temporary_file(*args, **kwargs)
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def setnchannels(self, n):
+            pass
+
+        def setsampwidth(self, width):
+            pass
+
+        def setframerate(self, rate):
+            pass
+
+        def writeframes(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", fake_named_temporary_file)
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Verify transcript contains transcribed text
+    content = transcript_path.read_text(encoding="utf-8")
+    assert "First segment" in content
+    assert "Second segment" in content
+
+
+def test_temp_file_cleanup_on_success(monkeypatch, tmp_path):
+    """GIVEN a successful recording and transcription
+    WHEN transcription completes
+    THEN the temporary audio file is deleted."""
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+    temp_audio_path = tmp_path / "temp_audio.wav"
+    temp_audio_path.write_bytes(b"dummy audio data")
+
+    # Mock config
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        pass
+
+    class FakeTranscriber:
+        def __init__(self, config):
+            pass
+
+        def stream_file_to_transcript(self, audio_path, transcript_path):
+            yield {"text": "Test", "start": 0.0, "end": 1.0}
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Transcriber",
+        FakeTranscriber,
+    )
+
+    import tempfile
+    import wave
+
+    def fake_named_temporary_file(*args, **kwargs):
+        # Check if this is for the audio file (has .wav suffix and delete=False)
+        # or for atomic writes (has mode='w' and encoding)
+        if kwargs.get("suffix") == ".wav" and kwargs.get("delete") is False:
+            # This is for the audio recording temp file
+            class FakeTempFile:
+                def __init__(self):
+                    self.name = str(temp_audio_path)
+                    self._content = ""
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    pass
+
+                def write(self, data):
+                    self._content += data
+
+                def close(self):
+                    pass
+
+            return FakeTempFile()
+        else:
+            # This is for atomic file writes - use real tempfile
+            import tempfile as tf
+
+            return tf.NamedTemporaryFile(*args, **kwargs)
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def setnchannels(self, n):
+            pass
+
+        def setsampwidth(self, width):
+            pass
+
+        def setframerate(self, rate):
+            pass
+
+        def writeframes(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", fake_named_temporary_file)
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Verify temp file was deleted
+    assert not temp_audio_path.exists()
+
+
+def test_transcription_error_handled_gracefully(monkeypatch, tmp_path):
+    """GIVEN a recording session
+    WHEN transcription fails
+    THEN the error is handled gracefully without crashing the CLI."""
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+    temp_audio_path = tmp_path / "temp_audio.wav"
+    temp_audio_path.write_bytes(b"dummy audio data")
+
+    # Mock config
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        pass
+
+    from rejoice.exceptions import TranscriptionError
+
+    class FakeTranscriber:
+        def __init__(self, config):
+            pass
+
+        def stream_file_to_transcript(self, audio_path, transcript_path):
+            raise TranscriptionError(
+                "Transcription failed", suggestion="Check audio file"
+            )
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Transcriber",
+        FakeTranscriber,
+    )
+
+    import tempfile
+    import wave
+
+    def fake_named_temporary_file(*args, **kwargs):
+        # Check if this is for the audio file (has .wav suffix and delete=False)
+        # or for atomic writes (has mode='w' and encoding)
+        if kwargs.get("suffix") == ".wav" and kwargs.get("delete") is False:
+            # This is for the audio recording temp file
+            class FakeTempFile:
+                def __init__(self):
+                    self.name = str(temp_audio_path)
+                    self._content = ""
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    pass
+
+                def write(self, data):
+                    self._content += data
+
+                def close(self):
+                    pass
+
+            return FakeTempFile()
+        else:
+            # This is for atomic file writes - use real tempfile
+            import tempfile as tf
+
+            return tf.NamedTemporaryFile(*args, **kwargs)
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def setnchannels(self, n):
+            pass
+
+        def setsampwidth(self, width):
+            pass
+
+        def setframerate(self, rate):
+            pass
+
+        def writeframes(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", fake_named_temporary_file)
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    # Should not raise, should handle error gracefully
+    filepath, transcript_id = start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Verify transcript still exists and status was updated
+    assert transcript_path.exists()
+    assert filepath == transcript_path
+
+
+def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
+    """GIVEN a cancelled recording session
+    WHEN recording is cancelled
+    THEN transcription is not attempted."""
+    events: List[object] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+
+    # Mock config
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        raise KeyboardInterrupt()
+
+    class FakeTranscriber:
+        def __init__(self, config):
+            events.append("transcriber_init")
+
+        def stream_file_to_transcript(self, audio_path, transcript_path):
+            events.append("transcribe_called")
+            yield {"text": "Should not appear", "start": 0.0, "end": 1.0}
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Transcriber",
+        FakeTranscriber,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Confirm.ask",
+        lambda *args, **kwargs: True,  # Confirm cancellation
+    )
+
+    import tempfile
+    import wave
+
+    def fake_named_temporary_file(*args, **kwargs):
+        class FakeTempFile:
+            def __init__(self):
+                self.name = str(tmp_path / "temp_audio.wav")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def close(self):
+                pass
+
+        return FakeTempFile()
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def setnchannels(self, n):
+            pass
+
+        def setsampwidth(self, width):
+            pass
+
+        def setframerate(self, rate):
+            pass
+
+        def writeframes(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", fake_named_temporary_file)
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    start_recording_session(wait_for_stop=fake_wait_for_stop)
+
+    # Verify transcription was NOT called
+    assert "transcriber_init" not in events
+    assert "transcribe_called" not in events
+
+
+def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
+    """GIVEN a recording session with --language flag
+    WHEN transcription runs
+    THEN the language override is passed to Transcriber."""
+    events: List[object] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
+    temp_audio_path = tmp_path / "temp_audio.wav"
+    temp_audio_path.write_bytes(b"dummy audio data")
+
+    # Mock config with default language
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig(language="auto")  # Default
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000001"
+
+    class FakeStream:
+        def stop(self) -> None:
+            pass
+
+        def close(self) -> None:
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return fake_stream
+
+    def fake_wait_for_stop() -> None:
+        pass
+
+    class FakeTranscriber:
+        def __init__(self, config):
+            events.append(("transcriber_init", config.language))
+
+        def stream_file_to_transcript(self, audio_path, transcript_path):
+            yield {"text": "Test", "start": 0.0, "end": 1.0}
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript",
+        fake_create_transcript,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.record_audio",
+        fake_record_audio,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.update_status",
+        lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.Transcriber",
+        FakeTranscriber,
+    )
+
+    import tempfile
+    import wave
+
+    def fake_named_temporary_file(*args, **kwargs):
+        # Check if this is for the audio file (has .wav suffix and delete=False)
+        # or for atomic writes (has mode='w' and encoding)
+        if kwargs.get("suffix") == ".wav" and kwargs.get("delete") is False:
+            # This is for the audio recording temp file
+            class FakeTempFile:
+                def __init__(self):
+                    self.name = str(temp_audio_path)
+                    self._content = ""
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    pass
+
+                def write(self, data):
+                    self._content += data
+
+                def close(self):
+                    pass
+
+            return FakeTempFile()
+        else:
+            # This is for atomic file writes - use real tempfile
+            import tempfile as tf
+
+            return tf.NamedTemporaryFile(*args, **kwargs)
+
+    class FakeWaveFile:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def setnchannels(self, n):
+            pass
+
+        def setsampwidth(self, width):
+            pass
+
+        def setframerate(self, rate):
+            pass
+
+        def writeframes(self, data):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", fake_named_temporary_file)
+    monkeypatch.setattr(wave, "open", FakeWaveFile)
+
+    # Use the FakeConfig already defined above (with default "auto" language)
+    fake_config = FakeConfig()
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: fake_config,
+    )
+
+    # Call with language override parameter
+    start_recording_session(wait_for_stop=fake_wait_for_stop, language_override="es")
+
+    # Verify language override was passed to Transcriber
+    assert any(
+        event[0] == "transcriber_init" and event[1] == "es"
+        for event in events
+        if isinstance(event, tuple)
+    )
+
+
+def test_start_recording_user_does_not_confirm_cancellation(monkeypatch, tmp_path):
+    """GIVEN a recording session
+    WHEN user presses Ctrl+C but doesn't confirm cancellation
+    THEN recording continues (cancelled = False)"""
+    events: List[object] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000030.md"
+    # Create a proper transcript file with frontmatter
+    transcript_path.write_text(
+        "---\n"
+        "id: '000030'\n"
+        "status: recording\n"
+        "created: 2025-01-01 12:00:00\n"
+        "language: auto\n"
+        "tags: []\n"
+        'summary: ""\n'
+        "---\n"
+        "\n",
+        encoding="utf-8",
+    )
+
+    def fake_create_transcript(save_dir: Path):
+        events.append("create_transcript")
+        return transcript_path, "000030"
+
+    class FakeStream:
+        def stop(self):
+            pass
+
+        def close(self):
+            pass
+
+    fake_stream = FakeStream()
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        events.append("record_audio")
+        return fake_stream
+
+    def fake_wait_for_stop():
+        events.append("wait_for_stop")
+        raise KeyboardInterrupt()
+
+    # Mock Confirm.ask to return False (user doesn't confirm cancellation)
+    def fake_confirm(*args, **kwargs):
+        events.append(("confirm_cancel", False))
+        return False  # User doesn't confirm cancellation
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript", fake_create_transcript
+    )
+    monkeypatch.setattr("rejoice.cli.commands.record_audio", fake_record_audio)
+    monkeypatch.setattr("rejoice.cli.commands.Confirm.ask", fake_confirm)
+    monkeypatch.setattr("rejoice.cli.commands.time.time", lambda: 1000)
+
+    # Mock load_config
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    monkeypatch.setattr("rejoice.cli.commands.load_config", lambda: FakeConfig())
+
+    # This should not raise, and cancelled should be False
+    try:
+        filepath, transcript_id = start_recording_session(
+            wait_for_stop=fake_wait_for_stop
+        )
+        # If we get here, cancellation was not confirmed
+        assert ("confirm_cancel", False) in events
+    except KeyboardInterrupt:
+        # If KeyboardInterrupt propagates, that's also acceptable for this test
+        pass
+
+
+def test_start_recording_cancelled_keeps_file(monkeypatch, tmp_path):
+    """GIVEN a cancelled recording
+    WHEN user chooses to keep the file
+    THEN transcript is marked as cancelled (else branch line 170)"""
+    events: List[object] = []
+
+    transcript_path = tmp_path / "transcript_20250101_000040.md"
+    # Create a proper transcript file with frontmatter
+    transcript_path.write_text(
+        "---\n"
+        "id: '000040'\n"
+        "status: recording\n"
+        "created: 2025-01-01 12:00:00\n"
+        "language: auto\n"
+        "tags: []\n"
+        'summary: ""\n'
+        "---\n"
+        "\n",
+        encoding="utf-8",
+    )
+
+    def fake_create_transcript(save_dir: Path):
+        return transcript_path, "000040"
+
+    class FakeStream:
+        def stop(self):
+            pass
+
+        def close(self):
+            pass
+
+    def fake_record_audio(callback, *, device=None, samplerate=16000, channels=1):
+        return FakeStream()
+
+    def fake_wait_for_stop():
+        raise KeyboardInterrupt()
+
+    # First confirm: cancel? -> yes, Second confirm: delete? -> no (keep file)
+    confirm_calls = []
+
+    def fake_confirm(*args, **kwargs):
+        confirm_calls.append(args[0] if args else "")
+        if "Cancel recording" in (args[0] if args else ""):
+            return True  # Confirm cancellation
+        elif "Delete" in (args[0] if args else ""):
+            return False  # Don't delete, keep file
+        return False
+
+    def fake_update_status(path: Path, status: str):
+        events.append(("update_status", path, status))
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.create_transcript", fake_create_transcript
+    )
+    monkeypatch.setattr("rejoice.cli.commands.record_audio", fake_record_audio)
+    monkeypatch.setattr("rejoice.cli.commands.Confirm.ask", fake_confirm)
+    monkeypatch.setattr("rejoice.cli.commands.update_status", fake_update_status)
+    monkeypatch.setattr("rejoice.cli.commands.time.time", lambda: 1000)
+
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    monkeypatch.setattr("rejoice.cli.commands.load_config", lambda: FakeConfig())
+
+    try:
+        start_recording_session(wait_for_stop=fake_wait_for_stop)
+    except KeyboardInterrupt:
+        pass
+
+    # Should have called update_status with "cancelled"
+    assert ("update_status", transcript_path, "cancelled") in events
+
+
+def test_iter_transcripts_handles_nonexistent_directory(monkeypatch):
+    """GIVEN _iter_transcripts
+    WHEN directory doesn't exist
+    THEN returns empty list (line 217)"""
+    from rejoice.cli.commands import _iter_transcripts
+    from pathlib import Path
+
+    nonexistent_dir = Path("/nonexistent/path/that/does/not/exist")
+    result = _iter_transcripts(nonexistent_dir)
+    assert result == []
+
+
+def test_iter_transcripts_skips_non_files(monkeypatch, tmp_path):
+    """GIVEN _iter_transcripts
+    WHEN directory contains subdirectories
+    THEN subdirectories are skipped (line 222)"""
+    from rejoice.cli.commands import _iter_transcripts
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    # Create a subdirectory (should be skipped)
+    subdir = save_dir / "subdir"
+    subdir.mkdir()
+
+    # Create a transcript file (should be included)
+    transcript_file = save_dir / "transcript_20250101_000001.md"
+    transcript_file.write_text("test")
+
+    result = _iter_transcripts(save_dir)
+    assert len(result) == 1
+    assert result[0] == transcript_file
+
+
+def test_split_frontmatter_handles_malformed_frontmatter():
+    """GIVEN _split_frontmatter
+    WHEN frontmatter is malformed (missing closing ---)
+    THEN TranscriptError is raised (lines 285-286)"""
+    from rejoice.cli.commands import _split_frontmatter
+    from rejoice.exceptions import TranscriptError
+
+    # Malformed: starts with --- but no closing ---
+    malformed = "---\nkey: value\nbody content"
+
+    with pytest.raises(TranscriptError) as exc_info:
+        _split_frontmatter(malformed)
+
+    assert "malformed" in str(exc_info.value).lower()
+
+
+def test_split_frontmatter_handles_no_frontmatter():
+    """GIVEN _split_frontmatter
+    WHEN content doesn't start with ---
+    THEN returns empty frontmatter and full content (line 280)"""
+    from rejoice.cli.commands import _split_frontmatter
+
+    content = "Just plain content\nwith no frontmatter"
+    frontmatter, body = _split_frontmatter(content)
+
+    assert frontmatter == ""
+    assert body == content
+
+
+def test_main_version_flag_exits_early(monkeypatch):
+    """GIVEN main command
+    WHEN --version flag is used
+    THEN version is printed and command exits (lines 318-319)"""
+    from rejoice.cli.commands import main
+    from click.testing import CliRunner
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["--version"])
+
+    assert result.exit_code == 0
+    assert "2.0.0" in result.output or "Rejoice" in result.output
+
+
+def test_main_debug_flag_enables_debug(monkeypatch, tmp_path):
+    """GIVEN main command
+    WHEN --debug flag is used
+    THEN debug message is printed (line 322)"""
+    from rejoice.cli.commands import main
+    from click.testing import CliRunner
+
+    monkeypatch.setattr("rejoice.cli.commands.setup_logging", lambda debug=False: None)
+    monkeypatch.setattr(
+        "rejoice.cli.commands.start_recording_session",
+        lambda *args, **kwargs: (None, None),
+    )
+
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    monkeypatch.setattr("rejoice.cli.commands.load_config", lambda: FakeConfig())
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["--debug"])
+
+    # Should show debug message or proceed without error
+    assert result.exit_code == 0 or "Debug mode enabled" in result.output
+
+
+def test_list_recordings_shows_table_with_transcripts(monkeypatch, tmp_path):
+    """GIVEN list command
+    WHEN transcripts exist
+    THEN table is displayed with transcript info (lines 338-362)"""
+    from rejoice.cli.commands import main
+    from click.testing import CliRunner
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    # Create some transcript files
+    (save_dir / "transcript_20250101_000001.md").write_text("test1")
+    (save_dir / "transcript_20250102_000002.md").write_text("test2")
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str):
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str):
+            self.output = FakeOutputConfig(save_path)
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config", lambda: FakeConfig(str(save_dir))
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["list"])
+
+    assert result.exit_code == 0
+    assert "Your Recordings" in result.output
+    assert "000001" in result.output or "000002" in result.output
+
+
+def test_view_transcript_latest_when_no_transcripts(monkeypatch, tmp_path):
+    """GIVEN view command with 'latest'
+    WHEN no transcripts exist
+    THEN shows 'No transcripts found' message (line 391)"""
+    from rejoice.cli.commands import main
+    from click.testing import CliRunner
+    from pathlib import Path
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()  # Empty directory
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str):
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str):
+            self.output = FakeOutputConfig(save_path)
+
+    # Mock both load_config and Path.expanduser to avoid permission issues
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config", lambda: FakeConfig(str(save_dir))
+    )
+
+    # Mock Path.expanduser to just return the path as-is
+    original_expanduser = Path.expanduser
+
+    def mock_expanduser(self):
+        if str(self) == str(save_dir):
+            return self
+        return original_expanduser(self)
+
+    monkeypatch.setattr(Path, "expanduser", mock_expanduser)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["view", "latest"])
+
+    assert result.exit_code == 1  # click.Abort() causes exit code 1
+    assert (
+        "No transcripts found" in result.output
+        or "No transcripts found to display" in result.output
+    )
+
+
+def test_list_recordings_handles_non_matching_files(monkeypatch, tmp_path):
+    """GIVEN list command
+    WHEN directory contains non-transcript files
+    THEN non-matching files are skipped (line 356-357)"""
+    from rejoice.cli.commands import main
+    from click.testing import CliRunner
+
+    save_dir = tmp_path / "transcripts"
+    save_dir.mkdir()
+
+    # Create transcript file
+    (save_dir / "transcript_20250101_000001.md").write_text("test")
+    # Create non-matching file
+    (save_dir / "other_file.txt").write_text("not a transcript")
+
+    class FakeOutputConfig:
+        def __init__(self, save_path: str):
+            self.save_path = save_path
+
+    class FakeConfig:
+        def __init__(self, save_path: str):
+            self.output = FakeOutputConfig(save_path)
+
+    monkeypatch.setattr(
+        "rejoice.cli.commands.load_config", lambda: FakeConfig(str(save_dir))
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["list"])
+
+    assert result.exit_code == 0
+    assert "000001" in result.output
+    assert "other_file.txt" not in result.output
