@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Tuple
 
 import pytest
-import click
 from click.testing import CliRunner
 
 from rejoice.cli.commands import (
@@ -35,10 +34,26 @@ def test_cli_version():
     assert "2.0.0" in result.output
 
 
-def test_cli_debug_flag():
+def test_cli_debug_flag(monkeypatch, tmp_path):
     """GIVEN --debug flag
     WHEN main is invoked
     THEN debug mode is enabled"""
+    monkeypatch.setattr("rejoice.cli.commands.setup_logging", lambda debug=False: None)
+    monkeypatch.setattr(
+        "rejoice.cli.commands.start_recording_session",
+        lambda *args, **kwargs: (None, None),
+    )
+
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    monkeypatch.setattr("rejoice.cli.commands.load_config", lambda: FakeConfig())
+
     runner = CliRunner()
     result = runner.invoke(main, ["--debug"])
     assert result.exit_code == 0
@@ -156,25 +171,25 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
     assert fake_stream.closed is True
 
 
-def test_default_wait_for_stop_uses_enter_and_getchar(monkeypatch, capsys):
+def test_default_wait_for_stop_uses_enter_and_input(monkeypatch, capsys):
     """GIVEN the default wait_for_stop implementation
     WHEN it is invoked
-    THEN it prompts for Enter and calls click.getchar().
+    THEN it prompts for Enter and calls input().
     """
-    calls = {"getchar_called": False}
+    calls = {"input_called": False}
 
-    def fake_getchar() -> str:
-        calls["getchar_called"] = True
-        # Simulate user pressing Enter
-        return "\n"
+    def fake_input(prompt: str = "") -> str:
+        calls["input_called"] = True
+        # Simulate user pressing Enter (input() returns empty string)
+        return ""
 
-    monkeypatch.setattr(click, "getchar", fake_getchar)
+    monkeypatch.setattr("builtins.input", fake_input)
 
     _default_wait_for_stop()
 
     captured = capsys.readouterr()
     assert "Press Enter to stop recording." in captured.out
-    assert calls["getchar_called"] is True
+    assert calls["input_called"] is True
 
 
 def test_start_recording_marks_transcript_completed(monkeypatch, tmp_path):

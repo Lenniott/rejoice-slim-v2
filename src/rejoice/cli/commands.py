@@ -38,7 +38,14 @@ def _default_wait_for_stop() -> None:
     ([R-007], [R-008]) build on this for richer control.
     """
     console.print("[bold]Press Enter to stop recording.[/bold]")
-    click.getchar()
+    # Use input() instead of click.getchar() for more reliable Enter key detection
+    # input() blocks until Enter is pressed and works consistently across platforms
+    try:
+        input()
+    except (EOFError, KeyboardInterrupt):
+        # Handle cases where stdin is not available or interrupted
+        # This will be caught by the outer KeyboardInterrupt handler
+        raise
 
 
 def start_recording_session(

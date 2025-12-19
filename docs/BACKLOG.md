@@ -8,10 +8,10 @@
 
 ## 📊 Progress Overview
 
-- **Total Stories:** 82
+- **Total Stories:** 83
 - **Completed:** 22
 - **In Progress:** 0
-- **Not Started:** 60
+- **Not Started:** 61
 
 ---
 
@@ -33,6 +33,7 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 - Core transcription:
   - ✅ [T-001], ✅ [T-002], ✅ [T-003]
   - ❌ [T-009] Connect Recording to Transcription
+  - ❌ [T-010] Real-Time Incremental Transcription During Recording
 - Core user commands:
   - ✅ [C-001], ✅ [C-003]
 
@@ -1157,6 +1158,151 @@ def start_recording_session():
 - Test cancellation skips transcription
 - Test language flag is passed through
 - Integration test full end-to-end flow
+
+---
+
+### [T-010] Real-Time Incremental Transcription During Recording
+**Priority:** High
+**Estimate:** L (1-2d)
+**Status:** ❌ Not Started
+**Dependencies:** [T-009, T-001, T-003]
+
+**User Story:**
+As a user, I want to see my transcript appear in real-time as I speak so that I can verify the recording is working and see my words appear incrementally in the file.
+
+**Acceptance Criteria:**
+- [ ] Transcript file is updated incrementally as speech segments are confirmed
+- [ ] Uses whisper_streaming library for real-time transcription
+- [ ] User can see new content appearing in the transcript file while recording
+- [ ] Partial audio is transcribed incrementally (not just at the end)
+- [ ] Thread-safe file writing (no corruption from concurrent writes)
+- [ ] Final transcription pass after recording stops to catch any remaining audio
+- [ ] Configurable min-chunk-size (default: 1 second)
+- [ ] Handle transcription errors gracefully without stopping recording
+- [ ] Show visual indicator when transcription is updating (optional)
+- [ ] Support VAD (Voice Activity Detection) for better segment detection
+
+**Technical Notes:**
+```python
+import threading
+from whisper_online import FasterWhisperASR, OnlineASRProcessor
+import numpy as np
+from queue import Queue
+
+def start_recording_with_realtime_transcription():
+    # Create transcript file
+    filepath, tid = create_transcript(save_dir)
+
+    # Initialize whisper_streaming
+    asr = FasterWhisperASR(
+        language=config.transcription.language or "en",
+        model_size=config.transcription.model
+    )
+    asr.use_vad()  # Enable VAD for better segment detection
+
+    online = OnlineASRProcessor(
+        asr,
+        buffer_trimming="segment",  # Trim on confirmed segments
+        buffer_trimming_sec=30.0    # Trim buffer when >30s
+    )
+
+    # Audio buffer for streaming
+    audio_queue = Queue()
+    recording_active = threading.Event()
+    recording_active.set()
+
+    # Start audio capture
+    def audio_callback(indata, frames, timing, status):
+        # Write to WAV file (for final pass)
+        wav_file.writeframes(convert_to_int16(indata))
+        # Also send to streaming transcription
+        audio_queue.put(indata.copy())
+
+    stream = record_audio(audio_callback, ...)
+
+    # Start background transcription thread
+    transcription_thread = threading.Thread(
+        target=realtime_transcription_worker,
+        args=(online, filepath, audio_queue, recording_active),
+        daemon=True
+    )
+    transcription_thread.start()
+
+    # Wait for user to stop recording
+    wait_for_stop()
+
+    # Signal transcription to finish
+    recording_active.clear()
+    transcription_thread.join(timeout=5.0)
+
+    # Final transcription pass for any remaining audio
+    final_output = online.finish()
+    if final_output:
+        append_to_transcript(filepath, final_output)
+
+def realtime_transcription_worker(online, filepath, audio_queue, recording_active):
+    """Background thread that processes audio chunks in real-time"""
+    import librosa
+
+    min_chunk_size = 1.0  # seconds
+    accumulated_samples = []
+    sample_rate = 16000
+
+    while recording_active.is_set() or not audio_queue.empty():
+        # Collect audio chunks
+        try:
+            chunk = audio_queue.get(timeout=0.1)
+            accumulated_samples.append(chunk)
+        except queue.Empty:
+            continue
+
+        # Check if we have enough audio (min_chunk_size seconds)
+        total_samples = sum(len(c) for c in accumulated_samples)
+        total_seconds = total_samples / sample_rate
+
+        if total_seconds >= min_chunk_size:
+            # Convert accumulated audio to numpy array
+            audio_array = np.concatenate(accumulated_samples)
+
+            # Insert into whisper_streaming processor
+            online.insert_audio_chunk(audio_array)
+
+            # Process and get confirmed output
+            output = online.process_iter()
+
+            # Append confirmed segments to transcript file (thread-safe)
+            if output:
+                with file_lock:
+                    append_to_transcript(filepath, output)
+
+            # Reset accumulated samples (buffer trimming handled by OnlineASRProcessor)
+            accumulated_samples = []
+```
+
+**Dependencies:**
+- `whisper-streaming` (from GitHub: ufal/whisper_streaming)
+- `librosa>=0.10.0` (for audio processing)
+- `soundfile>=0.12.0` (for audio I/O)
+- `torch>=2.0.0` (for VAD, optional but recommended)
+- `torchaudio>=2.0.0` (for VAD, optional but recommended)
+
+**Installation:**
+```bash
+pip install git+https://github.com/ufal/whisper_streaming
+pip install librosa soundfile
+pip install torch torchaudio  # Optional but recommended for VAD
+```
+
+**Test Requirements:**
+- Test transcription updates incrementally during recording
+- Test thread-safe file writing (concurrent transcription + recording)
+- Test that final transcription pass catches remaining audio
+- Test error handling (transcription failure doesn't stop recording)
+- Test with long recordings (>5 minutes)
+- Test with silence periods (VAD should handle gracefully)
+- Integration test: verify transcript file grows during recording
+- Test configurable min-chunk-size
+- Test VAD integration
 
 ---
 

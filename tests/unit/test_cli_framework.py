@@ -88,11 +88,27 @@ def test_config_init_command():
     assert result.exit_code in [0, 1]  # May exit with code 1 if cancelled
 
 
-def test_no_subcommand_shows_help():
+def test_no_subcommand_shows_help(monkeypatch, tmp_path):
     """GIVEN rec with no subcommand
     WHEN invoked
     THEN help or default behavior is shown"""
+    monkeypatch.setattr("rejoice.cli.commands.setup_logging", lambda debug=False: None)
+    monkeypatch.setattr(
+        "rejoice.cli.commands.start_recording_session",
+        lambda *args, **kwargs: (None, None),
+    )
+
+    from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
+
+    class FakeConfig:
+        def __init__(self):
+            self.audio = AudioConfig()
+            self.output = OutputConfig(save_path=str(tmp_path))
+            self.transcription = TranscriptionConfig()
+
+    monkeypatch.setattr("rejoice.cli.commands.load_config", lambda: FakeConfig())
+
     runner = CliRunner()
     result = runner.invoke(main, [])
-    # Should show help or default message
+    # Should show help or default message (or start recording which we've mocked)
     assert result.exit_code == 0
