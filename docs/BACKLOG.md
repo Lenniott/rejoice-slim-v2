@@ -1,6 +1,6 @@
 # 🎙️ Rejoice v2 - Development Backlog
 
-**Last Updated:** December 18, 2025
+**Last Updated:** December 19, 2025
 **Status:** Ready for Development
 **Target:** v2.0.0 Release
 
@@ -8,10 +8,10 @@
 
 ## 📊 Progress Overview
 
-- **Total Stories:** 84
-- **Completed:** 24
+- **Total Stories:** 87
+- **Completed:** 25
 - **In Progress:** 0
-- **Not Started:** 60
+- **Not Started:** 62
 
 ---
 
@@ -40,17 +40,17 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 **MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
 
 - Installation & setup:
-  - ❌ [I-007], ❌ [I-008]
+  - ✅ [I-007], ❌ [I-008]
 - Recording polish:
-  - ❌ [R-010], ❌ [R-011]
+  - ❌ [R-010], ❌ [R-011], ❌  [R-013]
 - Transcription usability:
   - ❌ [T-004]
 - Advanced transcription features:
-  - ❌ [A-001], ❌ [A-002], ❌ [A-003], ❌ [A-004]
+  - ❌ [A-001], ❌ [A-002], ❌ [A-003], ❌ [A-004],
 - CLI quality of life:
-  - ❌ [C-004], ❌ [C-005], ❌ [C-009]
+  - ❌ [C-004], ❌ [C-005], ❌ [C-009], ❌ [C-011]
 - Settings & configuration:
-  - ❌ [S-001], ❌ [S-002], ❌ [S-003], ❌ [S-004], ❌ [S-005], ❌ [S-006], ❌ [S-007], ❌ [S-010]
+  - ❌ [S-001], ✅ [S-002], ❌ [S-003], ❌ [S-004], ❌ [S-005], ❌ [S-006], ❌ [S-007], ❌ [S-010]
 - Basic AI assist:
   - ❌ [AI-001], ❌ [AI-002], ❌ [AI-004]
 - Polish & quality:
@@ -79,7 +79,7 @@ Audio capture, file management, recording controls
 
 ### Phase 3: Transcription System (Week 3) 📝
 faster-whisper integration, streaming to file, file processing
-- 8 stories | 5-7 days
+- 9 stories | 5-7 days
 
 ### Phase 4: Advanced Transcription (Week 4) 🎯
 Speaker diarization, timestamps, quality metrics
@@ -91,7 +91,7 @@ Ollama integration, summaries, tags, titles, analysis
 
 ### Phase 6: User Commands (Week 6) 💻
 List, view, search, export, continue commands
-- 10 stories | 5-6 days
+- 11 stories | 5-6 days
 
 ### Phase 7: Configuration & Settings (Week 7) ⚙️
 Settings menu, microphone setup, model config, doctor command
@@ -1111,6 +1111,148 @@ def record_and_transcribe():
 
 ---
 
+### [R-013] Audio File Archiving for Lossless Information
+**Priority:** High
+**Estimate:** M (4-8h)
+**Status:** ❌ Not Started
+**Dependencies:** [R-012, T-009]
+
+**User Story:**
+As a user, I want my audio files permanently saved alongside transcripts so that I never lose my recordings even if transcription fails or I need to re-process the audio later. This ensures lossless information preservation - if I record for an hour, I don't want to lose that hour of content.
+
+**Acceptance Criteria:**
+- [ ] Audio files saved in `audio/` subdirectory within transcript save directory
+- [ ] Audio file name matches transcript filename (e.g., `transcript_20251220_000054.md` → `transcript_20251220_000054.wav`)
+- [ ] Audio file saved immediately when recording stops (before transcription)
+- [ ] Audio file preserved even if transcription fails
+- [ ] After successful transcription, prompt user: "Would you like to delete the audio file? (y/n)" (default: n)
+- [ ] Config option: `audio.keep_after_transcription` (default: true)
+- [ ] Config option: `audio.auto_delete` (default: false) - if true, skip prompt and keep
+- [ ] Audio file path stored in transcript frontmatter for reference
+- [ ] Handle existing audio files gracefully (don't overwrite without confirmation)
+- [ ] Create `audio/` directory automatically if it doesn't exist
+
+**Technical Notes:**
+```python
+from pathlib import Path
+from rich.prompt import Confirm
+
+def archive_audio_file(temp_audio_path: Path, transcript_path: Path) -> Path:
+    """Move temporary audio file to permanent archive location.
+
+    Args:
+        temp_audio_path: Path to temporary WAV file created during recording
+        transcript_path: Path to the transcript MD file
+
+    Returns:
+        Path to archived audio file
+    """
+    # Create audio subdirectory
+    audio_dir = transcript_path.parent / "audio"
+    audio_dir.mkdir(exist_ok=True)
+
+    # Generate matching filename (same stem as transcript)
+    audio_filename = transcript_path.stem + ".wav"
+    archived_audio_path = audio_dir / audio_filename
+
+    # Handle existing file (shouldn't happen, but be safe)
+    if archived_audio_path.exists():
+        # Option 1: Append timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        audio_filename = f"{transcript_path.stem}_{timestamp}.wav"
+        archived_audio_path = audio_dir / audio_filename
+
+    # Move temp file to archive location
+    temp_audio_path.rename(archived_audio_path)
+
+    return archived_audio_path
+
+def prompt_audio_deletion(audio_path: Path, config) -> bool:
+    """Prompt user to delete audio file after successful transcription.
+
+    Returns:
+        True if user wants to delete, False otherwise
+    """
+    # Check config for auto-delete setting
+    if config.audio.auto_delete:
+        return True
+
+    # Check config for keep setting (skip prompt)
+    if config.audio.keep_after_transcription is False:
+        return False
+
+    # Prompt user
+    return Confirm.ask(
+        f"Delete audio file to save space?\n  {audio_path.name}",
+        default=False
+    )
+
+# In start_recording_session(), after transcription completes:
+# 1. Archive audio file (move from temp location)
+archived_audio_path = archive_audio_file(temp_audio_path, filepath)
+
+# 2. Update frontmatter with audio file path
+update_frontmatter(filepath, {
+    'audio_file': str(archived_audio_path.relative_to(filepath.parent))
+})
+
+# 3. After successful transcription, prompt for deletion
+if transcription_successful:
+    if prompt_audio_deletion(archived_audio_path, config):
+        archived_audio_path.unlink(missing_ok=True)
+        console.print(f"🗑️  Audio file deleted: {archived_audio_path.name}")
+    else:
+        console.print(f"💾 Audio file kept: {archived_audio_path}")
+else:
+    # Transcription failed - always keep audio for recovery
+    console.print(f"⚠️  Transcription failed. Audio file kept for recovery: {archived_audio_path}")
+```
+
+**Directory Structure:**
+```
+~/Documents/transcripts/
+├── transcript_20251220_000054.md
+├── transcript_20251220_000055.md
+└── audio/
+    ├── transcript_20251220_000054.wav
+    └── transcript_20251220_000055.wav
+```
+
+**Configuration:**
+```yaml
+audio:
+  device: default
+  sample_rate: 16000
+  keep_after_transcription: true  # Default: keep audio files
+  auto_delete: false             # If true, delete without prompt (overrides keep_after_transcription)
+```
+
+**Frontmatter Example:**
+```yaml
+---
+id: "000054"
+date: "2025-12-20"
+status: "completed"
+audio_file: "audio/transcript_20251220_000054.wav"
+language: "en"
+---
+```
+
+**Test Requirements:**
+- Test audio file saved to correct location with matching name
+- Test audio directory created automatically
+- Test audio file preserved when transcription fails
+- Test deletion prompt appears after successful transcription
+- Test config option `keep_after_transcription: false` skips prompt
+- Test config option `auto_delete: true` deletes without prompt
+- Test frontmatter updated with audio file path
+- Test existing audio file handling (timestamp append)
+- Test audio file deletion actually removes file
+- Test audio file kept when user declines deletion
+- Integration test: full recording → archive → transcription → prompt flow
+
+---
+
 ## Phase 3: Transcription System (Week 3)
 
 ### [T-001] faster-whisper Integration
@@ -1650,13 +1792,104 @@ def process(files: List[Path]):
 
 ---
 
+### [T-011] Migrate from faster-whisper to WhisperX
+**Priority:** High
+**Estimate:** M (4-8h)
+**Status:** ❌ Not Started
+**Dependencies:** [T-001, T-003, T-009]
+
+**User Story:**
+As a developer, I want to use WhisperX as the transcription engine so that we have a foundation for future features like timestamps and speaker diarization, while maintaining all existing single-pass transcription functionality.
+
+**Acceptance Criteria:**
+- [ ] Replace faster-whisper with WhisperX in Transcriber class
+- [ ] Maintain backward compatibility with existing API (same segment format)
+- [ ] All existing transcription features continue to work (VAD, language detection, single-pass)
+- [ ] Single-pass transcription after recording ([T-009]) continues to function identically
+- [ ] Model loading and caching behavior unchanged
+- [ ] Update dependencies: whisperx replaces faster-whisper in requirements
+- [ ] Update [A-001] dependency from [T-001] to [T-011]
+- [ ] All existing tests pass without modification
+- [ ] Performance is equivalent or better than faster-whisper baseline
+- [ ] Update documentation to reflect WhisperX usage
+
+**Technical Notes:**
+```python
+import whisperx
+
+class Transcriber:
+    def __init__(self, config):
+        # WhisperX uses faster-whisper under the hood
+        # but provides additional features we'll use later (timestamps, diarization)
+        self.model = whisperx.load_model(
+            config.model,
+            device="cpu",
+            compute_type="int8",
+            language=config.language if config.language != "auto" else None
+        )
+        self._config = config
+        self._last_language = None
+
+    def transcribe_file(self, audio_path: str):
+        # Use WhisperX API for basic transcription
+        # For now, use simple transcription (no alignment/diarization)
+        # This will be extended in [A-001], [A-003] for advanced features
+        result = self.model.transcribe(
+            audio_path,
+            vad_filter=self._config.vad_filter,
+            language=self._config.language if self._config.language != "auto" else None
+        )
+
+        # Normalize output to match existing segment format
+        # WhisperX returns segments in similar format to faster-whisper
+        for segment in result["segments"]:
+            yield {
+                "text": segment["text"].strip(),
+                "start": float(segment["start"]),
+                "end": float(segment["end"]),
+            }
+
+        # Track language for [T-002]
+        if "language" in result:
+            self._last_language = result["language"]
+```
+
+**Migration Strategy:**
+1. Update `src/rejoice/transcription/__init__.py` to use WhisperX instead of faster-whisper
+2. Update `requirements.txt` and `pyproject.toml` dependencies (whisperx replaces faster-whisper)
+3. Verify all existing tests pass (API compatibility should make this seamless)
+4. Test single-pass transcription after recording still works
+5. Update documentation comments to reflect WhisperX usage
+6. Update [A-001] dependency chain from [T-001] to [T-011]
+7. Note: Real-time streaming ([T-010]) was removed, so this migration only affects post-recording transcription
+
+**Benefits:**
+- Foundation for [A-001] WhisperX Integration (diarization)
+- Foundation for [A-003] Timestamp Integration (word-level timestamps via alignment)
+- Better alignment capabilities for future features
+- Same underlying faster-whisper engine, so performance should be equivalent
+- Cleaner path forward for advanced transcription features
+
+**Test Requirements:**
+- All existing transcription tests pass
+- Test with all model sizes (tiny, base, small, medium, large)
+- Test VAD functionality
+- Test language detection (auto and explicit)
+- Test single-pass transcription flow after recording
+- Test long audio files (>30 minutes)
+- Performance benchmark vs. faster-whisper baseline
+- Verify WhisperX models are cached correctly
+- Test error handling (missing model, invalid audio, etc.)
+
+---
+
 ## Phase 4: Advanced Transcription Features (Week 4)
 
 ### [A-001] WhisperX Integration
 **Priority:** Medium
 **Estimate:** L (1-2d)
 **Status:** ❌ Not Started
-**Dependencies:** [T-001]
+**Dependencies:** [T-011]
 
 **User Story:**
 As a user, I want speaker diarization so that I can identify who said what in conversations.
@@ -2236,10 +2469,10 @@ for file in files:
 As a user, I want to see all my recordings so that I can find what I'm looking for.
 
 **Acceptance Criteria:**
-- [ ] `rec list` shows all transcripts
-- [ ] Display: ID | Date | Filename
-- [ ] Sorted by date (newest first)
-- [ ] Pagination for many files
+- [x] `rec list` shows all transcripts
+- [x] Display: ID | Date | Filename
+- [x] Sorted by date (newest first)
+- [ ] Pagination for many files (limit parameter exists, full pagination not implemented)
 - [ ] Total count shown
 
 **Technical Notes:**
@@ -2325,11 +2558,11 @@ def list_recordings(
 As a user, I want to read a transcript in the terminal so that I can review content quickly.
 
 **Acceptance Criteria:**
-- [ ] `rec view <id>` displays transcript
-- [ ] Syntax highlighting for markdown
-- [ ] Frontmatter shown separately (or hidden by default)
+- [x] `rec view <id>` displays transcript
+- [x] Syntax highlighting for markdown
+- [x] Frontmatter shown separately (or hidden by default)
 - [ ] Pagination for long transcripts
-- [ ] `rec view latest` shows most recent
+- [x] `rec view latest` shows most recent
 
 **Technical Notes:**
 ```python
@@ -2642,6 +2875,51 @@ def export(transcript_id: str, format: str = 'pdf'):
 
 ---
 
+### [C-011] Code Block Formatting for Obsidian
+**Priority:** Medium
+**Estimate:** S (2-4h)
+**Status:** ❌ Not Started
+**Dependencies:** [C-003]
+
+**User Story:**
+As an Obsidian user, I want transcript content wrapped in code blocks so that I can easily copy transcripts using Obsidian's code block copy icon.
+
+**Acceptance Criteria:**
+- [ ] `rec view <id>` wraps transcript body in ` ```transcript ` code block
+- [ ] Frontmatter remains outside code block (if shown)
+- [ ] Code block preserves markdown formatting
+- [ ] Works with `rec view latest`
+- [ ] Optional flag `--no-code-block` to disable wrapping (for plain text viewing)
+
+**Technical Notes:**
+```python
+from rich.markdown import Markdown
+
+@app.command()
+def view(transcript_id: str, no_code_block: bool = False):
+    filepath = get_transcript_by_id(transcript_id)
+    frontmatter, body = parse_transcript(filepath)
+
+    if no_code_block:
+        # Original behavior - render markdown directly
+        md = Markdown(body)
+        console.print(md)
+    else:
+        # Wrap in code block for Obsidian compatibility
+        code_block = f"```transcript\n{body}\n```"
+        md = Markdown(code_block)
+        console.print(md)
+```
+
+**Test Requirements:**
+- Test code block wrapping
+- Test with frontmatter shown/hidden
+- Test `--no-code-block` flag
+- Test with long transcripts
+- Verify Obsidian copy icon appears (manual test)
+
+---
+
 ## Phase 7: Configuration & Settings (Week 7)
 
 ### [S-001] Interactive Settings Menu
@@ -2688,17 +2966,17 @@ def settings():
 ### [S-002] Microphone Configuration
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-001, S-001]
 
 **User Story:**
 As a user, I want to select my microphone so that Rejoice uses the right input device.
 
 **Acceptance Criteria:**
-- [ ] List available microphones
-- [ ] Show current selection
-- [ ] Test microphone with live audio level meter
-- [ ] Save selection to config
+- [x] List available microphones
+- [x] Show current selection
+- [x] Test microphone with live audio level meter
+- [x] Save selection to config
 
 **Technical Notes:**
 ```python
@@ -3966,20 +4244,20 @@ As the project team, we want to announce Rejoice so that users can discover it.
 
 ### By Priority
 - **Critical:** 28 stories
-- **High:** 24 stories
+- **High:** 25 stories
 - **Medium:** 28 stories
 - **Low:** 10 stories
 
 ### By Estimate
 - **XS (<2h):** 0 stories
 - **S (2-4h):** 28 stories
-- **M (4-8h):** 40 stories
+- **M (4-8h):** 41 stories
 - **L (1-2d):** 16 stories
 - **XL (2-5d):** 6 stories
 
 ### By Phase
 - **Phase 1 (Foundation):** 6 stories
-- **Phase 2 (Recording):** 10 stories
+- **Phase 2 (Recording):** 11 stories
 - **Phase 3 (Transcription):** 8 stories
 - **Phase 4 (Advanced):** 5 stories
 - **Phase 5 (AI):** 10 stories
