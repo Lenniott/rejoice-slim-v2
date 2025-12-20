@@ -271,3 +271,197 @@ def test_config_mic_skips_test_when_user_declines(tmp_path, monkeypatch):
 
             config_data = yaml.safe_load(config_file.read_text())
             assert config_data["audio"]["device"] == "default"
+
+
+def test_settings_command_opens_menu(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN invoked
+    THEN interactive menu is displayed"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("transcription:\n  model: medium\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    # Simulate user selecting "Exit" immediately
+    result = runner.invoke(main, ["config", "settings"], input="q\n")
+
+    assert result.exit_code == 0
+    assert "Settings" in result.output or "settings" in result.output.lower()
+
+
+def test_settings_shows_current_values(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN viewing a setting category
+    THEN current values are displayed"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text(
+        "transcription:\n  model: small\n  language: en\noutput:\n  save_path: ~/test\n"
+    )
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    # Navigate to transcription settings, then exit
+    result = runner.invoke(main, ["config", "settings"], input="1\nq\nq\n")
+
+    assert result.exit_code == 0
+    # Should show current model value
+    assert "small" in result.output or "Model" in result.output
+
+
+def test_settings_updates_transcription_model(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN updating transcription model
+    THEN config file is updated"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("transcription:\n  model: medium\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    # Navigate: Main menu -> Transcription -> Model -> Enter new value
+    # -> No to "change another" -> Back -> Exit
+    result = runner.invoke(
+        main,
+        ["config", "settings"],
+        input="1\n1\nlarge\nn\nq\nq\n",
+    )
+
+    assert result.exit_code == 0
+    # Verify config was updated
+    import yaml
+
+    config_data = yaml.safe_load(config_file.read_text())
+    assert config_data["transcription"]["model"] == "large"
+
+
+def test_settings_validates_model_input(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN entering invalid model name
+    THEN validation error is shown and value is not saved"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("transcription:\n  model: medium\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    # Try to set invalid model, then exit
+    result = runner.invoke(
+        main,
+        ["config", "settings"],
+        input="1\n1\ninvalid_model\nn\n1\nmedium\nn\nq\n",
+    )
+
+    assert result.exit_code == 0
+    # Should show validation error
+    assert "invalid" in result.output.lower() or "valid" in result.output.lower()
+    # Original value should remain
+    import yaml
+
+    config_data = yaml.safe_load(config_file.read_text())
+    assert config_data["transcription"]["model"] == "medium"
+
+
+def test_settings_updates_save_path(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN updating save path
+    THEN config file is updated with expanded path"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("output:\n  save_path: ~/Documents/transcripts\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    new_path = str(tmp_path / "new_transcripts")
+    # Navigate: Main menu -> Output -> Save Path -> Enter new path
+    # -> No to "change another" -> Back -> Exit
+    result = runner.invoke(
+        main,
+        ["config", "settings"],
+        input=f"2\n1\n{new_path}\nn\nq\nq\n",
+    )
+
+    assert result.exit_code == 0
+    # Verify config was updated
+    import yaml
+
+    config_data = yaml.safe_load(config_file.read_text())
+    # Path should be saved (may be expanded or as-is depending on implementation)
+    assert "new_transcripts" in config_data["output"]["save_path"]
+
+
+def test_settings_validates_boolean_input(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN updating boolean setting
+    THEN accepts yes/no or true/false and saves correctly"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("output:\n  auto_copy: true\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    # Navigate: Main menu -> Output -> Auto Copy -> Toggle -> Exit
+    result = runner.invoke(
+        main,
+        ["config", "settings"],
+        input="2\n3\nn\nn\nq\nq\n",
+    )
+
+    assert result.exit_code == 0
+    # Verify config was updated
+    import yaml
+
+    config_data = yaml.safe_load(config_file.read_text())
+    assert config_data["output"]["auto_copy"] is False
+
+
+def test_settings_preserves_other_config_values(tmp_path, monkeypatch):
+    """GIVEN rec settings
+    WHEN updating one setting
+    THEN other config values are preserved"""
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    original_config = """transcription:
+  model: medium
+  language: en
+output:
+  save_path: ~/test
+  auto_copy: true
+audio:
+  device: default
+"""
+    config_file.write_text(original_config)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    runner = CliRunner()
+    # Only update transcription model
+    result = runner.invoke(
+        main,
+        ["config", "settings"],
+        input="1\n1\nsmall\nn\nq\nq\n",
+    )
+
+    assert result.exit_code == 0
+    # Verify only model changed, other values preserved
+    import yaml
+
+    config_data = yaml.safe_load(config_file.read_text())
+    assert config_data["transcription"]["model"] == "small"
+    assert config_data["transcription"]["language"] == "en"
+    assert config_data["output"]["auto_copy"] is True
+    assert config_data["audio"]["device"] == "default"

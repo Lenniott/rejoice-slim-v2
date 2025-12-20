@@ -1,6 +1,6 @@
 # 🎙️ Rejoice v2 - Development Backlog
 
-**Last Updated:** December 19, 2025
+**Last Updated:** December 18, 2025
 **Status:** Ready for Development
 **Target:** v2.0.0 Release
 
@@ -8,10 +8,10 @@
 
 ## 📊 Progress Overview
 
-- **Total Stories:** 87
-- **Completed:** 25
+- **Total Stories:** 82
+- **Completed:** 22
 - **In Progress:** 0
-- **Not Started:** 62
+- **Not Started:** 60
 
 ---
 
@@ -32,29 +32,21 @@ These priority tiers sit **above phases**. When choosing what to work on next:
   - ✅ [R-001], ✅ [R-002], ✅ [R-003], ✅ [R-004], ✅ [R-006], ✅ [R-007], ✅ [R-008]
 - Core transcription:
   - ✅ [T-001], ✅ [T-002], ✅ [T-003]
-  - ✅ [T-009] Connect Recording to Transcription
-  - ✅ [T-010] Real-Time Incremental Transcription During Recording
 - Core user commands:
   - ✅ [C-001], ✅ [C-003]
 
 **MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
 
-- Installation & setup:
-  - ✅ [I-007], ❌ [I-008]
 - Recording polish:
-  - ❌ [R-010], ❌ [R-011], ❌  [R-013]
+  - ❌ [R-009], ❌ [R-010]
 - Transcription usability:
-  - ❌ [T-004]
-- Advanced transcription features:
-  - ❌ [A-001], ❌ [A-002], ❌ [A-003], ❌ [A-004],
+  - ❌ [T-004], ❌ [T-005], ❌ [T-006]
 - CLI quality of life:
-  - ❌ [C-004], ❌ [C-005], ❌ [C-009], ❌ [C-011]
-- Settings & configuration:
-  - ✅ [S-001], ✅ [S-002], ❌ [S-003], ❌ [S-004], ❌ [S-005], ❌ [S-006], ❌ [S-007], ❌ [S-010]
+  - ❌ [C-002], ❌ [C-004], ❌ [C-005]
+- Settings & setup:
+  - ❌ [S-001], ❌ [S-002], ❌ [S-004]
 - Basic AI assist:
-  - ✅ [AI-001], ❌ [AI-002], ❌ [AI-004]
-- Polish & quality:
-  - ❌ [P-001], ❌ [P-002], ❌ [P-003], ❌ [P-004], ❌ [P-008]
+  - ❌ [AI-001], ❌ [AI-003], ❌ [AI-005]
 
 **MLP (Minimum Lovable Product) – Everything else**
 
@@ -79,7 +71,7 @@ Audio capture, file management, recording controls
 
 ### Phase 3: Transcription System (Week 3) 📝
 faster-whisper integration, streaming to file, file processing
-- 9 stories | 5-7 days
+- 8 stories | 5-7 days
 
 ### Phase 4: Advanced Transcription (Week 4) 🎯
 Speaker diarization, timestamps, quality metrics
@@ -91,7 +83,7 @@ Ollama integration, summaries, tags, titles, analysis
 
 ### Phase 6: User Commands (Week 6) 💻
 List, view, search, export, continue commands
-- 11 stories | 5-6 days
+- 10 stories | 5-6 days
 
 ### Phase 7: Configuration & Settings (Week 7) ⚙️
 Settings menu, microphone setup, model config, doctor command
@@ -959,300 +951,6 @@ As a user, I want transcript IDs at the start of filenames so that files are alw
 
 ---
 
-### [R-012] Simplified Recording with Visual Feedback
-**Priority:** High
-**Estimate:** M (4-8h)
-**Status:** ✅ Done
-**Dependencies:** [R-006, R-002]
-
-**User Story:**
-As a user, I want clear visual feedback during recording so that I know the system is working, without the complexity of real-time transcription. After I stop recording, I want a single accurate transcription pass with clear progress indication.
-
-**Example Terminal Output:**
-```bash
-$ rec
-
-🎙️  Recording started (ID 000054)
-📄  Transcript: /Users/benjamin/Documents/transcripts/transcript_20251220_000054.md
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Rejoice                                                                          ┃
-┃                                                                                  ┃
-┃ 🔴 Recording...                                                                  ┃
-┃ ⏱️  00:05                                                                         ┃
-┃ 🎤 [████████████░░░░░░░░]                                                        ┃
-┃                                                                                  ┃
-┃ Press Enter to stop recording.                                                  ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-[User presses Enter]
-
-⏹️  Stopping recording...
-
-🔄 Transcribing...
-Transcribing... ████████████████████████████████████████ 100% 0:03.2
-
-✅ Transcript saved: /Users/benjamin/Documents/transcripts/transcript_20251220_000054.md
-```
-
-**Acceptance Criteria:**
-- [x] Show "🔴 Recording..." indicator during recording
-- [x] Display elapsed time in MM:SS format, updating every second
-- [x] Show audio level meter (visual bars) to confirm microphone is working
-- [x] Use Rich Live display for smooth updates without flicker
-- [x] When Enter is pressed, immediately stop recording and close WAV file
-- [x] Show "Transcribing..." with progress bar during single transcription pass
-- [x] Transcribe complete WAV file using faster-whisper (single pass, no duplication)
-- [x] Write final transcript to file atomically
-- [x] Clean up temporary WAV file after transcription
-- [x] No real-time transcription complexity - just record, then transcribe
-
-**Technical Notes:**
-```python
-from rich.live import Live
-from rich.panel import Panel
-from rich.progress import Progress, BarColumn, TimeElapsedColumn
-import numpy as np
-
-def calculate_audio_level(audio_chunk: np.ndarray) -> float:
-    """Calculate RMS audio level for visual meter."""
-    return np.sqrt(np.mean(audio_chunk**2))
-
-def show_recording_display(filepath, start_time, audio_level_callback):
-    """Display live recording status with elapsed time and audio level."""
-    with Live(auto_refresh=False) as live:
-        while recording:
-            elapsed = time.time() - start_time
-            minutes, seconds = divmod(int(elapsed), 60)
-            audio_level = audio_level_callback()
-
-            # Create audio level bars (0-20 bars)
-            level_bars = "█" * int(audio_level * 20)
-
-            panel = Panel(
-                f"🔴 Recording...\n"
-                f"⏱️  {minutes:02d}:{seconds:02d}\n"
-                f"🎤 [{level_bars:<20}]",
-                title="Rejoice",
-                border_style="red"
-            )
-            live.update(panel)
-            time.sleep(0.1)  # Update 10 times per second for smooth display
-
-def record_and_transcribe():
-    """Simplified flow: record to WAV, then transcribe."""
-    # 1. Create transcript file
-    filepath, tid = create_transcript(save_dir)
-
-    # 2. Start recording with visual feedback
-    start_time = time.time()
-    audio_level = 0.0
-
-    def audio_callback(indata, frames, timing, status):
-        nonlocal audio_level
-        # Write to WAV file
-        wav_file.writeframes(convert_to_int16(indata))
-        # Calculate audio level for meter
-        audio_level = calculate_audio_level(indata)
-
-    stream = record_audio(audio_callback, ...)
-
-    # Show live display in separate thread
-    display_thread = threading.Thread(
-        target=show_recording_display,
-        args=(filepath, start_time, lambda: audio_level),
-        daemon=True
-    )
-    display_thread.start()
-
-    # Wait for Enter
-    wait_for_stop()
-
-    # Stop recording immediately
-    stream.stop()
-    stream.close()
-    wav_file.close()
-
-    # Single transcription pass with progress
-    console.print("\n🔄 Transcribing...")
-    with Progress(
-        BarColumn(),
-        TimeElapsedColumn(),
-        console=console
-    ) as progress:
-        task = progress.add_task("Transcribing", total=None)
-        transcriber = Transcriber(config.transcription)
-        segments = []
-        for segment in transcriber.transcribe_file(str(wav_file_path)):
-            text = segment.get("text", "").strip()
-            if text:
-                segments.append(text)
-
-        # Write final transcript
-        final_text = " ".join(segments)
-        append_to_transcript(filepath, final_text)
-
-    # Clean up
-    temp_audio_path.unlink()
-    console.print(f"✅ Transcript saved: {filepath}")
-```
-
-
-
-**Test Requirements:**
-- Test recording display updates correctly
-- Test elapsed time increments properly
-- Test audio level meter responds to input
-- Test Enter key stops recording immediately
-- Test single transcription pass completes successfully
-- Test WAV file is cleaned up after transcription
-- Test transcript file contains final accurate text (no duplication)
-- Integration test: full recording → transcription → file verification
-
----
-
-### [R-013] Audio File Archiving for Lossless Information
-**Priority:** High
-**Estimate:** M (4-8h)
-**Status:** ❌ Not Started
-**Dependencies:** [R-012, T-009]
-
-**User Story:**
-As a user, I want my audio files permanently saved alongside transcripts so that I never lose my recordings even if transcription fails or I need to re-process the audio later. This ensures lossless information preservation - if I record for an hour, I don't want to lose that hour of content.
-
-**Acceptance Criteria:**
-- [ ] Audio files saved in `audio/` subdirectory within transcript save directory
-- [ ] Audio file name matches transcript filename (e.g., `transcript_20251220_000054.md` → `transcript_20251220_000054.wav`)
-- [ ] Audio file saved immediately when recording stops (before transcription)
-- [ ] Audio file preserved even if transcription fails
-- [ ] After successful transcription, prompt user: "Would you like to delete the audio file? (y/n)" (default: n)
-- [ ] Config option: `audio.keep_after_transcription` (default: true)
-- [ ] Config option: `audio.auto_delete` (default: false) - if true, skip prompt and keep
-- [ ] Audio file path stored in transcript frontmatter for reference
-- [ ] Handle existing audio files gracefully (don't overwrite without confirmation)
-- [ ] Create `audio/` directory automatically if it doesn't exist
-
-**Technical Notes:**
-```python
-from pathlib import Path
-from rich.prompt import Confirm
-
-def archive_audio_file(temp_audio_path: Path, transcript_path: Path) -> Path:
-    """Move temporary audio file to permanent archive location.
-
-    Args:
-        temp_audio_path: Path to temporary WAV file created during recording
-        transcript_path: Path to the transcript MD file
-
-    Returns:
-        Path to archived audio file
-    """
-    # Create audio subdirectory
-    audio_dir = transcript_path.parent / "audio"
-    audio_dir.mkdir(exist_ok=True)
-
-    # Generate matching filename (same stem as transcript)
-    audio_filename = transcript_path.stem + ".wav"
-    archived_audio_path = audio_dir / audio_filename
-
-    # Handle existing file (shouldn't happen, but be safe)
-    if archived_audio_path.exists():
-        # Option 1: Append timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_filename = f"{transcript_path.stem}_{timestamp}.wav"
-        archived_audio_path = audio_dir / audio_filename
-
-    # Move temp file to archive location
-    temp_audio_path.rename(archived_audio_path)
-
-    return archived_audio_path
-
-def prompt_audio_deletion(audio_path: Path, config) -> bool:
-    """Prompt user to delete audio file after successful transcription.
-
-    Returns:
-        True if user wants to delete, False otherwise
-    """
-    # Check config for auto-delete setting
-    if config.audio.auto_delete:
-        return True
-
-    # Check config for keep setting (skip prompt)
-    if config.audio.keep_after_transcription is False:
-        return False
-
-    # Prompt user
-    return Confirm.ask(
-        f"Delete audio file to save space?\n  {audio_path.name}",
-        default=False
-    )
-
-# In start_recording_session(), after transcription completes:
-# 1. Archive audio file (move from temp location)
-archived_audio_path = archive_audio_file(temp_audio_path, filepath)
-
-# 2. Update frontmatter with audio file path
-update_frontmatter(filepath, {
-    'audio_file': str(archived_audio_path.relative_to(filepath.parent))
-})
-
-# 3. After successful transcription, prompt for deletion
-if transcription_successful:
-    if prompt_audio_deletion(archived_audio_path, config):
-        archived_audio_path.unlink(missing_ok=True)
-        console.print(f"🗑️  Audio file deleted: {archived_audio_path.name}")
-    else:
-        console.print(f"💾 Audio file kept: {archived_audio_path}")
-else:
-    # Transcription failed - always keep audio for recovery
-    console.print(f"⚠️  Transcription failed. Audio file kept for recovery: {archived_audio_path}")
-```
-
-**Directory Structure:**
-```
-~/Documents/transcripts/
-├── transcript_20251220_000054.md
-├── transcript_20251220_000055.md
-└── audio/
-    ├── transcript_20251220_000054.wav
-    └── transcript_20251220_000055.wav
-```
-
-**Configuration:**
-```yaml
-audio:
-  device: default
-  sample_rate: 16000
-  keep_after_transcription: true  # Default: keep audio files
-  auto_delete: false             # If true, delete without prompt (overrides keep_after_transcription)
-```
-
-**Frontmatter Example:**
-```yaml
----
-id: "000054"
-date: "2025-12-20"
-status: "completed"
-audio_file: "audio/transcript_20251220_000054.wav"
-language: "en"
----
-```
-
-**Test Requirements:**
-- Test audio file saved to correct location with matching name
-- Test audio directory created automatically
-- Test audio file preserved when transcription fails
-- Test deletion prompt appears after successful transcription
-- Test config option `keep_after_transcription: false` skips prompt
-- Test config option `auto_delete: true` deletes without prompt
-- Test frontmatter updated with audio file path
-- Test existing audio file handling (timestamp append)
-- Test audio file deletion actually removes file
-- Test audio file kept when user declines deletion
-- Integration test: full recording → archive → transcription → prompt flow
-
----
-
 ## Phase 3: Transcription System (Week 3)
 
 ### [T-001] faster-whisper Integration
@@ -1377,232 +1075,6 @@ def streaming_transcription(audio_stream, transcript_file):
 - Test crash recovery (file has partial content)
 - Test with long recordings
 - Integration test full pipeline
-
----
-
-### [T-009] Connect Recording to Transcription
-**Priority:** Critical
-**Estimate:** M (4-8h)
-**Status:** ✅ Done
-**Dependencies:** [R-006, T-001, T-003]
-
-**User Story:**
-As a user, I want my recorded audio to be automatically transcribed so that when I run `rec`, I get a transcript file with actual text, not just metadata.
-
-**Acceptance Criteria:**
-- [x] Audio from recording callback is saved to a temporary file during recording
-- [x] After recording stops, temporary audio file is passed to Transcriber
-- [x] Transcription runs automatically and appends text to transcript file
-- [x] Temporary audio file is cleaned up after transcription completes
-- [x] Transcription errors are handled gracefully without crashing the CLI
-- [x] Cancelled recordings skip transcription (no transcription attempted)
-- [x] Language from CLI `--language` flag is passed to Transcriber when provided
-
-**Technical Notes:**
-```python
-import wave
-import tempfile
-from pathlib import Path
-
-def start_recording_session():
-    # ... existing transcript creation ...
-
-    # Create temporary audio file
-    temp_audio = tempfile.NamedTemporaryFile(
-        suffix='.wav',
-        delete=False,
-        dir=save_dir
-    )
-    temp_audio_path = Path(temp_audio.name)
-
-    # Audio callback writes to WAV file
-    wav_file = wave.open(str(temp_audio_path), 'wb')
-    wav_file.setnchannels(1)  # mono
-    wav_file.setsampwidth(2)   # 16-bit
-    wav_file.setframerate(16000)  # 16kHz
-
-    def _audio_callback(indata, frames, timing, status):
-        # Write audio buffer to WAV file
-        wav_file.writeframes(indata.tobytes())
-
-    stream = record_audio(_audio_callback, ...)
-
-    try:
-        wait_for_stop()
-    finally:
-        stream.stop()
-        stream.close()
-        wav_file.close()
-
-        # Transcribe if not cancelled
-        if not cancelled:
-            try:
-                transcriber = Transcriber(config.transcription)
-                list(transcriber.stream_file_to_transcript(
-                    str(temp_audio_path),
-                    filepath
-                ))
-            except TranscriptionError as e:
-                console.print(f"[yellow]Transcription failed: {e}[/yellow]")
-            finally:
-                # Always clean up temp file
-                temp_audio_path.unlink(missing_ok=True)
-```
-
-**Test Requirements:**
-- Test audio is saved correctly during recording
-- Test transcription runs after recording stops
-- Test transcript file contains transcribed text
-- Test temp file cleanup on success
-- Test temp file cleanup on error
-- Test cancellation skips transcription
-- Test language flag is passed through
-- Integration test full end-to-end flow
-
----
-
-### [T-010] Real-Time Incremental Transcription During Recording
-**Priority:** High
-**Estimate:** L (1-2d)
-**Status:** ✅ Done
-**Dependencies:** [T-009, T-001, T-003]
-
-**User Story:**
-As a user, I want to see my transcript appear in real-time as I speak so that I can verify the recording is working and see my words appear incrementally in the file.
-
-**Acceptance Criteria:**
-- [x] Transcript file is updated incrementally as speech segments are confirmed
-- [x] Uses faster-whisper with chunked processing for real-time transcription (alternative to whisper_streaming to maintain "slim" philosophy)
-- [x] User can see new content appearing in the transcript file while recording
-- [x] Partial audio is transcribed incrementally (not just at the end)
-- [x] Thread-safe file writing (no corruption from concurrent writes)
-- [x] Final transcription pass after recording stops to catch any remaining audio
-- [x] Configurable min-chunk-size (default: 1 second, implemented as 1.0 seconds)
-- [x] Handle transcription errors gracefully without stopping recording
-- [ ] Show visual indicator when transcription is updating (optional - deferred)
-- [x] Support VAD (Voice Activity Detection) for better segment detection (via faster-whisper)
-
-**Technical Notes:**
-```python
-import threading
-from whisper_online import FasterWhisperASR, OnlineASRProcessor
-import numpy as np
-from queue import Queue
-
-def start_recording_with_realtime_transcription():
-    # Create transcript file
-    filepath, tid = create_transcript(save_dir)
-
-    # Initialize whisper_streaming
-    asr = FasterWhisperASR(
-        language=config.transcription.language or "en",
-        model_size=config.transcription.model
-    )
-    asr.use_vad()  # Enable VAD for better segment detection
-
-    online = OnlineASRProcessor(
-        asr,
-        buffer_trimming="segment",  # Trim on confirmed segments
-        buffer_trimming_sec=30.0    # Trim buffer when >30s
-    )
-
-    # Audio buffer for streaming
-    audio_queue = Queue()
-    recording_active = threading.Event()
-    recording_active.set()
-
-    # Start audio capture
-    def audio_callback(indata, frames, timing, status):
-        # Write to WAV file (for final pass)
-        wav_file.writeframes(convert_to_int16(indata))
-        # Also send to streaming transcription
-        audio_queue.put(indata.copy())
-
-    stream = record_audio(audio_callback, ...)
-
-    # Start background transcription thread
-    transcription_thread = threading.Thread(
-        target=realtime_transcription_worker,
-        args=(online, filepath, audio_queue, recording_active),
-        daemon=True
-    )
-    transcription_thread.start()
-
-    # Wait for user to stop recording
-    wait_for_stop()
-
-    # Signal transcription to finish
-    recording_active.clear()
-    transcription_thread.join(timeout=5.0)
-
-    # Final transcription pass for any remaining audio
-    final_output = online.finish()
-    if final_output:
-        append_to_transcript(filepath, final_output)
-
-def realtime_transcription_worker(online, filepath, audio_queue, recording_active):
-    """Background thread that processes audio chunks in real-time"""
-    import librosa
-
-    min_chunk_size = 1.0  # seconds
-    accumulated_samples = []
-    sample_rate = 16000
-
-    while recording_active.is_set() or not audio_queue.empty():
-        # Collect audio chunks
-        try:
-            chunk = audio_queue.get(timeout=0.1)
-            accumulated_samples.append(chunk)
-        except queue.Empty:
-            continue
-
-        # Check if we have enough audio (min_chunk_size seconds)
-        total_samples = sum(len(c) for c in accumulated_samples)
-        total_seconds = total_samples / sample_rate
-
-        if total_seconds >= min_chunk_size:
-            # Convert accumulated audio to numpy array
-            audio_array = np.concatenate(accumulated_samples)
-
-            # Insert into whisper_streaming processor
-            online.insert_audio_chunk(audio_array)
-
-            # Process and get confirmed output
-            output = online.process_iter()
-
-            # Append confirmed segments to transcript file (thread-safe)
-            if output:
-                with file_lock:
-                    append_to_transcript(filepath, output)
-
-            # Reset accumulated samples (buffer trimming handled by OnlineASRProcessor)
-            accumulated_samples = []
-```
-
-**Dependencies:**
-- `whisper-streaming` (from GitHub: ufal/whisper_streaming)
-- `librosa>=0.10.0` (for audio processing)
-- `soundfile>=0.12.0` (for audio I/O)
-- `torch>=2.0.0` (for VAD, optional but recommended)
-- `torchaudio>=2.0.0` (for VAD, optional but recommended)
-
-**Installation:**
-```bash
-pip install git+https://github.com/ufal/whisper_streaming
-pip install librosa soundfile
-pip install torch torchaudio  # Optional but recommended for VAD
-```
-
-**Test Requirements:**
-- Test transcription updates incrementally during recording
-- Test thread-safe file writing (concurrent transcription + recording)
-- Test that final transcription pass catches remaining audio
-- Test error handling (transcription failure doesn't stop recording)
-- Test with long recordings (>5 minutes)
-- Test with silence periods (VAD should handle gracefully)
-- Integration test: verify transcript file grows during recording
-- Test configurable min-chunk-size
-- Test VAD integration
 
 ---
 
@@ -1792,104 +1264,13 @@ def process(files: List[Path]):
 
 ---
 
-### [T-011] Migrate from faster-whisper to WhisperX
-**Priority:** High
-**Estimate:** M (4-8h)
-**Status:** ❌ Not Started
-**Dependencies:** [T-001, T-003, T-009]
-
-**User Story:**
-As a developer, I want to use WhisperX as the transcription engine so that we have a foundation for future features like timestamps and speaker diarization, while maintaining all existing single-pass transcription functionality.
-
-**Acceptance Criteria:**
-- [ ] Replace faster-whisper with WhisperX in Transcriber class
-- [ ] Maintain backward compatibility with existing API (same segment format)
-- [ ] All existing transcription features continue to work (VAD, language detection, single-pass)
-- [ ] Single-pass transcription after recording ([T-009]) continues to function identically
-- [ ] Model loading and caching behavior unchanged
-- [ ] Update dependencies: whisperx replaces faster-whisper in requirements
-- [ ] Update [A-001] dependency from [T-001] to [T-011]
-- [ ] All existing tests pass without modification
-- [ ] Performance is equivalent or better than faster-whisper baseline
-- [ ] Update documentation to reflect WhisperX usage
-
-**Technical Notes:**
-```python
-import whisperx
-
-class Transcriber:
-    def __init__(self, config):
-        # WhisperX uses faster-whisper under the hood
-        # but provides additional features we'll use later (timestamps, diarization)
-        self.model = whisperx.load_model(
-            config.model,
-            device="cpu",
-            compute_type="int8",
-            language=config.language if config.language != "auto" else None
-        )
-        self._config = config
-        self._last_language = None
-
-    def transcribe_file(self, audio_path: str):
-        # Use WhisperX API for basic transcription
-        # For now, use simple transcription (no alignment/diarization)
-        # This will be extended in [A-001], [A-003] for advanced features
-        result = self.model.transcribe(
-            audio_path,
-            vad_filter=self._config.vad_filter,
-            language=self._config.language if self._config.language != "auto" else None
-        )
-
-        # Normalize output to match existing segment format
-        # WhisperX returns segments in similar format to faster-whisper
-        for segment in result["segments"]:
-            yield {
-                "text": segment["text"].strip(),
-                "start": float(segment["start"]),
-                "end": float(segment["end"]),
-            }
-
-        # Track language for [T-002]
-        if "language" in result:
-            self._last_language = result["language"]
-```
-
-**Migration Strategy:**
-1. Update `src/rejoice/transcription/__init__.py` to use WhisperX instead of faster-whisper
-2. Update `requirements.txt` and `pyproject.toml` dependencies (whisperx replaces faster-whisper)
-3. Verify all existing tests pass (API compatibility should make this seamless)
-4. Test single-pass transcription after recording still works
-5. Update documentation comments to reflect WhisperX usage
-6. Update [A-001] dependency chain from [T-001] to [T-011]
-7. Note: Real-time streaming ([T-010]) was removed, so this migration only affects post-recording transcription
-
-**Benefits:**
-- Foundation for [A-001] WhisperX Integration (diarization)
-- Foundation for [A-003] Timestamp Integration (word-level timestamps via alignment)
-- Better alignment capabilities for future features
-- Same underlying faster-whisper engine, so performance should be equivalent
-- Cleaner path forward for advanced transcription features
-
-**Test Requirements:**
-- All existing transcription tests pass
-- Test with all model sizes (tiny, base, small, medium, large)
-- Test VAD functionality
-- Test language detection (auto and explicit)
-- Test single-pass transcription flow after recording
-- Test long audio files (>30 minutes)
-- Performance benchmark vs. faster-whisper baseline
-- Verify WhisperX models are cached correctly
-- Test error handling (missing model, invalid audio, etc.)
-
----
-
 ## Phase 4: Advanced Transcription Features (Week 4)
 
 ### [A-001] WhisperX Integration
 **Priority:** Medium
 **Estimate:** L (1-2d)
 **Status:** ❌ Not Started
-**Dependencies:** [T-011]
+**Dependencies:** [T-001]
 
 **User Story:**
 As a user, I want speaker diarization so that I can identify who said what in conversations.
@@ -2063,18 +1444,18 @@ transcription:
 ### [AI-001] Ollama Client Integration
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [F-004]
 
 **User Story:**
 As a user, I want AI-powered analysis so that I can extract insights from transcripts.
 
 **Acceptance Criteria:**
-- [x] Ollama REST API integration
-- [x] Connection test: `rec doctor ollama`
-- [x] Model selection configurable
-- [x] Handle Ollama not running gracefully
-- [x] Streaming response support
+- [ ] Ollama REST API integration
+- [ ] Connection test: `rec doctor ollama`
+- [ ] Model selection configurable
+- [ ] Handle Ollama not running gracefully
+- [ ] Streaming response support
 
 **Technical Notes:**
 ```python
@@ -2469,10 +1850,10 @@ for file in files:
 As a user, I want to see all my recordings so that I can find what I'm looking for.
 
 **Acceptance Criteria:**
-- [x] `rec list` shows all transcripts
-- [x] Display: ID | Date | Filename
-- [x] Sorted by date (newest first)
-- [ ] Pagination for many files (limit parameter exists, full pagination not implemented)
+- [ ] `rec list` shows all transcripts
+- [ ] Display: ID | Date | Filename
+- [ ] Sorted by date (newest first)
+- [ ] Pagination for many files
 - [ ] Total count shown
 
 **Technical Notes:**
@@ -2558,11 +1939,11 @@ def list_recordings(
 As a user, I want to read a transcript in the terminal so that I can review content quickly.
 
 **Acceptance Criteria:**
-- [x] `rec view <id>` displays transcript
-- [x] Syntax highlighting for markdown
-- [x] Frontmatter shown separately (or hidden by default)
+- [ ] `rec view <id>` displays transcript
+- [ ] Syntax highlighting for markdown
+- [ ] Frontmatter shown separately (or hidden by default)
 - [ ] Pagination for long transcripts
-- [x] `rec view latest` shows most recent
+- [ ] `rec view latest` shows most recent
 
 **Technical Notes:**
 ```python
@@ -2875,57 +2256,12 @@ def export(transcript_id: str, format: str = 'pdf'):
 
 ---
 
-### [C-011] Code Block Formatting for Obsidian
-**Priority:** Medium
-**Estimate:** S (2-4h)
-**Status:** ❌ Not Started
-**Dependencies:** [C-003]
-
-**User Story:**
-As an Obsidian user, I want transcript content wrapped in code blocks so that I can easily copy transcripts using Obsidian's code block copy icon.
-
-**Acceptance Criteria:**
-- [ ] `rec view <id>` wraps transcript body in ` ```transcript ` code block
-- [ ] Frontmatter remains outside code block (if shown)
-- [ ] Code block preserves markdown formatting
-- [ ] Works with `rec view latest`
-- [ ] Optional flag `--no-code-block` to disable wrapping (for plain text viewing)
-
-**Technical Notes:**
-```python
-from rich.markdown import Markdown
-
-@app.command()
-def view(transcript_id: str, no_code_block: bool = False):
-    filepath = get_transcript_by_id(transcript_id)
-    frontmatter, body = parse_transcript(filepath)
-
-    if no_code_block:
-        # Original behavior - render markdown directly
-        md = Markdown(body)
-        console.print(md)
-    else:
-        # Wrap in code block for Obsidian compatibility
-        code_block = f"```transcript\n{body}\n```"
-        md = Markdown(code_block)
-        console.print(md)
-```
-
-**Test Requirements:**
-- Test code block wrapping
-- Test with frontmatter shown/hidden
-- Test `--no-code-block` flag
-- Test with long transcripts
-- Verify Obsidian copy icon appears (manual test)
-
----
-
 ## Phase 7: Configuration & Settings (Week 7)
 
 ### [S-001] Interactive Settings Menu
 **Priority:** High
 **Estimate:** L (1-2d)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [F-004]
 
 **User Story:**
@@ -2966,17 +2302,17 @@ def settings():
 ### [S-002] Microphone Configuration
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [R-001, S-001]
 
 **User Story:**
 As a user, I want to select my microphone so that Rejoice uses the right input device.
 
 **Acceptance Criteria:**
-- [x] List available microphones
-- [x] Show current selection
-- [x] Test microphone with live audio level meter
-- [x] Save selection to config
+- [ ] List available microphones
+- [ ] Show current selection
+- [ ] Test microphone with live audio level meter
+- [ ] Save selection to config
 
 **Technical Notes:**
 ```python
@@ -3678,20 +3014,20 @@ fi
 ### [I-007] First-Run Setup
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [I-004, S-002]
 
 **User Story:**
 As a new user, I want guided setup so that Rejoice is configured correctly on first use.
 
 **Acceptance Criteria:**
-- [x] Detect first run (no config file)
-- [x] Welcome message
-- [x] Test microphone
-- [x] Choose save location
-- [x] Choose and download Whisper model (if not already downloaded)
-- [x] Test Ollama (optional)
-- [x] Create sample transcript
+- [ ] Detect first run (no config file)
+- [ ] Welcome message
+- [ ] Test microphone
+- [ ] Choose save location
+- [ ] Download default Whisper model
+- [ ] Test Ollama (optional)
+- [ ] Create sample transcript
 
 **Technical Notes:**
 ```python
@@ -3905,110 +3241,6 @@ with Progress() as progress:
 - Test all progress indicators
 - Test with various durations
 - Test cancellation during progress
-
----
-
-### [P-011] Clean Recording UI & Output Format
-**Priority:** High
-**Estimate:** M (4-8h)
-**Status:** ❌ Not Started
-**Dependencies:** [R-006, T-001, T-010]
-
-**User Story:**
-As a user, I want a clean, minimal output when recording so that I can focus on speaking without distraction from verbose logs.
-
-**Acceptance Criteria:**
-- [ ] Clean startup message: "New note starting..."
-- [ ] Show file name clearly
-- [ ] Show "Transcribe started (time)"
-- [ ] Clear instruction: "Press Enter to stop or ^C to cancel"
-- [ ] Visual indicator that recording is active (spinner or minimal indicator)
-- [ ] Suppress all INFO/DEBUG logs during recording (save to file only)
-- [ ] On stop: "Stopped at {time} total {duration}"
-- [ ] Show "Copied to clipboard" if auto-copy enabled
-- [ ] Show "Finishing up..." during final transcription
-- [ ] Final message: "File saved: {path}"
-- [ ] Fix Enter key detection (ensure stdin is not blocked)
-- [ ] No verbose faster-whisper output in console
-- [ ] No VAD/language detection spam in console
-
-**Technical Notes:**
-```python
-# Suppress console logging during recording
-# Set console handler level to WARNING during recording
-console_handler.setLevel(logging.WARNING)
-
-# Clean output format
-console.print("New note starting...")
-console.print(f"\n{filepath.name}\n")
-console.print(f"Transcribe started {start_time.strftime('%H:%M:%S')}")
-console.print("Press Enter to stop or ^C to cancel\n")
-
-# Visual indicator
-with console.status("[bold green]● Recording...", spinner="dots"):
-    wait_for_stop()
-
-# After stop
-console.print(f"\nStopped at {stop_time.strftime('%H:%M:%S')} (total {duration})")
-if auto_copy:
-    console.print("Copied to clipboard")
-console.print("\nFinishing up...")
-console.print(f'File saved: "{filepath}"')
-```
-
-**Implementation Points:**
-- Temporarily raise console log level to WARNING during recording
-- Suppress faster-whisper HTTP requests and processing logs
-- Use Rich status/spinner for visual feedback
-- Ensure `input()` works correctly (check stdin not blocked by audio stream)
-- Restore log level after recording completes
-- Keep all logs in file, just hide from console
-
-**Test Requirements:**
-- Test Enter key stops recording reliably
-- Test Ctrl+C cancels recording
-- Test output is clean and minimal
-- Test logs still written to file
-- Test with different recording durations
-- Test auto-copy message appears when enabled
-
-**Technical Notes:**
-```python
-from rich.console import Console
-from rich.spinner import Spinner
-from rich.progress import Progress, SpinnerColumn, TextColumn
-
-console = Console()
-
-# For quick operations (< 3 seconds)
-with console.status("[bold green]Loading transcription model...") as status:
-    transcriber = Transcriber(config.transcription)
-
-# For longer operations (> 3 seconds)
-with Progress(
-    SpinnerColumn(),
-    TextColumn("[progress.description]{task.description}"),
-    console=console
-) as progress:
-    task = progress.add_task("Loading model...", total=None)
-    transcriber = Transcriber(config.transcription)
-    progress.update(task, completed=100)
-```
-
-**Implementation Points:**
-- Add feedback in `start_recording_session()` before model initialization
-- Wrap `Transcriber.__init__()` with progress indicator
-- Show audio device initialization feedback
-- Consider model download progress (first-time use)
-- Keep messages concise and professional
-
-**Test Requirements:**
-- Test with cold start (model not cached)
-- Test with warm start (model cached)
-- Test with different model sizes (tiny vs large)
-- Test with slow systems (simulate slow model loading)
-- Test feedback doesn't interfere with recording start
-- Test all messages are clear and actionable
 
 ---
 
@@ -4244,27 +3476,27 @@ As the project team, we want to announce Rejoice so that users can discover it.
 
 ### By Priority
 - **Critical:** 28 stories
-- **High:** 25 stories
+- **High:** 23 stories
 - **Medium:** 28 stories
 - **Low:** 10 stories
 
 ### By Estimate
 - **XS (<2h):** 0 stories
 - **S (2-4h):** 28 stories
-- **M (4-8h):** 41 stories
+- **M (4-8h):** 39 stories
 - **L (1-2d):** 16 stories
 - **XL (2-5d):** 6 stories
 
 ### By Phase
 - **Phase 1 (Foundation):** 6 stories
-- **Phase 2 (Recording):** 11 stories
+- **Phase 2 (Recording):** 10 stories
 - **Phase 3 (Transcription):** 8 stories
 - **Phase 4 (Advanced):** 5 stories
 - **Phase 5 (AI):** 10 stories
 - **Phase 6 (Commands):** 10 stories
 - **Phase 7 (Settings):** 10 stories
 - **Phase 8 (Installation):** 9 stories
-- **Phase 9 (Polish):** 11 stories
+- **Phase 9 (Polish):** 10 stories
 
 ---
 

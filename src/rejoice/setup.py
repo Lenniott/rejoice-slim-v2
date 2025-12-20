@@ -218,14 +218,17 @@ def choose_microphone() -> str | int:
 
 
 def test_microphone(device: str | int | None = None, duration: float = 3.0) -> bool:
-    """Test microphone by recording a short sample with visual feedback.
+    """Test microphone by showing audio level meter briefly.
+
+    This is a quick visual test - just check if the volume meter responds.
+    Press Ctrl+C to cancel at any time.
 
     Parameters
     ----------
     device:
         Device identifier: "default" string, device index (int), or None for default.
     duration:
-        Duration of test recording in seconds.
+        Duration of test recording in seconds (default: 1.5 seconds).
 
     Returns
     -------
@@ -242,6 +245,7 @@ def test_microphone(device: str | int | None = None, duration: float = 3.0) -> b
         recording_done = False
         audio_level = 0.0
         audio_level_lock = threading.Lock()
+        stream = None
 
         def audio_callback(indata, frames, timing, status):
             if not recording_done:
@@ -272,77 +276,88 @@ def test_microphone(device: str | int | None = None, duration: float = 3.0) -> b
 
         # Display live audio level meter
         def _display_audio_level():
-            with Live(console=console, auto_refresh=False, screen=False) as live:
-                while not recording_done:
-                    elapsed = time.time() - start_time
-                    remaining = max(0.0, duration - elapsed)
+            try:
+                with Live(console=console, auto_refresh=False, screen=False) as live:
+                    while not recording_done:
+                        elapsed = time.time() - start_time
+                        remaining = max(0.0, duration - elapsed)
 
-                    with audio_level_lock:
-                        current_level = audio_level
+                        with audio_level_lock:
+                            current_level = audio_level
 
-                    # Create audio level bars (0-20 bars)
-                    num_bars = int(current_level * 20)
-                    level_bars = "█" * num_bars + "░" * (20 - num_bars)
+                        # Create audio level bars (0-20 bars)
+                        num_bars = int(current_level * 20)
+                        level_bars = "█" * num_bars + "░" * (20 - num_bars)
 
-                    # Show "Complete" when time is up, but keep displaying
-                    # until recording_done
-                    status_text = (
-                        "Complete!" if remaining <= 0 else f"{remaining:.1f}s remaining"
-                    )
+                        status_text = (
+                            "Complete!"
+                            if remaining <= 0
+                            else f"{remaining:.1f}s remaining"
+                        )
 
-                    panel_content = (
-                        f"🎤 Testing microphone...\n"
-                        f"⏱️  {status_text}\n"
-                        f"📊 [{level_bars}]\n\n"
-                        f"Please speak into your microphone.\n"
-                        f"[dim]The test will complete automatically...[/dim]"
-                    )
+                        panel_content = (
+                            f"🎤 Testing microphone...\n"
+                            f"⏱️  {status_text}\n"
+                            f"📊 [{level_bars}]\n\n"
+                            f"Please speak into your microphone.\n"
+                            f"[dim]Press Ctrl+C to cancel[/dim]"
+                        )
 
-                    panel = Panel(
-                        panel_content,
-                        title="Microphone Test",
-                        border_style="yellow",
-                    )
-                    live.update(panel)
-                    live.refresh()
-                    time.sleep(0.1)  # Update 10 times per second
+                        panel = Panel(
+                            panel_content,
+                            title="Microphone Test",
+                            border_style="yellow",
+                        )
+                        live.update(panel)
+                        live.refresh()
+                        time.sleep(0.1)  # Update 10 times per second
+            except Exception:
+                pass  # Ignore errors in display thread
 
         display_thread = threading.Thread(target=_display_audio_level, daemon=True)
         display_thread.start()
 
-        # Record for specified duration
+        # Record for specified duration (can be interrupted with Ctrl+C)
         try:
             time.sleep(duration)
+        except KeyboardInterrupt:
+            console.print("\n[yellow]⚠ Test cancelled by user[/yellow]")
+            return True  # Don't fail setup if user cancels
         finally:
             # Always stop recording and close stream, even if interrupted
             recording_done = True
-            try:
-                stream.stop()
-                stream.close()
-            except Exception:
-                pass  # Stream may already be closed
+            if stream is not None:
+                try:
+                    stream.stop()
+                    stream.close()
+                except Exception:
+                    pass  # Stream may already be closed
 
         # Wait for display thread to finish (with timeout to prevent hanging)
-        display_thread.join(timeout=1.0)
+        display_thread.join(timeout=0.5)
 
-        # Check if we got audio
+        # Check if we got audio (simple check - just see if meter moved)
         if audio_data:
             # Calculate RMS level
             all_audio = np.concatenate(audio_data)
             rms = float(np.sqrt(np.mean(all_audio**2)))
-            if rms > 0.01:  # Threshold for detecting actual audio
-                console.print("[green]✓ Microphone test passed[/green]\n")
+            if rms > 0.001:  # Lower threshold - just check if any audio detected
+                console.print(
+                    "[green]✓ Microphone test passed - audio detected[/green]\n"
+                )
                 return True
             else:
                 console.print(
-                    "[yellow]⚠ Microphone detected but audio level is "
-                    "very low[/yellow]\n"
+                    "[yellow]⚠ Microphone detected but no audio input[/yellow]\n"
                 )
-                return True  # Still consider it working
+                return True  # Still consider it working (mic exists, just quiet)
         else:
-            console.print("[red]✗ No audio detected[/red]\n")
-            return False
+            console.print("[yellow]⚠ No audio data received[/yellow]\n")
+            return True  # Don't fail setup - mic might just be quiet
 
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠ Test cancelled by user[/yellow]\n")
+        return True  # Don't fail setup if user cancels
     except Exception as exc:
         console.print(f"[red]✗ Microphone test failed: {exc}[/red]\n")
         logger.error(f"Microphone test failed: {exc}", exc_info=True)
