@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [I-007] First-Run Setup
+  - Implemented guided setup wizard for new users in `src/rejoice/setup.py`
+  - Detects first run by checking for config file existence
+  - Interactive model selection with descriptions (tiny, base, small, medium, large)
+  - Automatic Whisper model download if not already available locally
+  - Microphone testing with audio level detection
+  - Save location configuration with directory creation
+  - Optional Ollama connection testing
+  - Sample transcript creation to demonstrate format
+  - Integrated into CLI - automatically prompts on first run (can be skipped with `--skip-setup`)
+  - All setup steps are optional and can be cancelled
+  - Configuration is saved to `~/.config/rejoice/config.yaml` after setup
+  - Tests: 14 new unit tests, all passing (79% coverage for setup module)
+
 - [R-012] Simplified Recording with Visual Feedback
   - Implemented Rich Live display showing recording status, elapsed time (MM:SS), and audio level meter (visual bars) during recording.
   - Removed real-time transcription complexity - recording now uses a simple record-then-transcribe flow.

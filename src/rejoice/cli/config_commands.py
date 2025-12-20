@@ -1,10 +1,14 @@
 """Configuration CLI commands."""
+
 import click
 from rich.console import Console
 from rich.table import Table
 
+import yaml
+
 from rejoice.audio import get_audio_input_devices
-from rejoice.core.config import get_config_dir, load_config
+from rejoice.core.config import get_config_dir, get_default_config, load_config
+from rejoice.setup import choose_microphone, test_microphone
 
 console = Console()
 
@@ -152,3 +156,59 @@ def list_mics() -> None:
         "\nUse the device index or name in your config.yaml under the "
         "'audio.device' setting."
     )
+
+
+@config_group.command("mic")
+def mic():
+    """Configure microphone selection and test it."""
+    from rich.prompt import Confirm
+
+    try:
+        # Choose microphone
+        selected_device = choose_microphone()
+
+        # Test microphone
+        if Confirm.ask("Test this microphone?", default=True):
+            mic_ok = test_microphone(device=selected_device)
+            if not mic_ok:
+                console.print(
+                    "[yellow]⚠ Microphone test had issues, "
+                    "but configuration was saved.[/yellow]"
+                )
+
+        # Save to config
+        config_dir = get_config_dir()
+        config_file = config_dir / "config.yaml"
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        # Load existing config or use defaults
+        if config_file.exists():
+            with open(config_file, "r") as f:
+                config_data = yaml.safe_load(f) or {}
+        else:
+            config_data = get_default_config()
+
+        # Update audio device
+        if "audio" not in config_data:
+            config_data["audio"] = {}
+        config_data["audio"]["device"] = (
+            str(selected_device)
+            if isinstance(selected_device, int)
+            else selected_device
+        )
+
+        # Save config
+        with open(config_file, "w") as f:
+            yaml.dump(config_data, f, default_flow_style=False)
+
+        device_display = (
+            f"Device {selected_device}"
+            if isinstance(selected_device, int)
+            else "System default"
+        )
+        console.print(f"[green]✓ Microphone configured: {device_display}[/green]")
+        console.print(f"[dim]Configuration saved to {config_file}[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error configuring microphone: {e}[/red]")
+        raise click.Abort()

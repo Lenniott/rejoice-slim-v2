@@ -1,4 +1,5 @@
 """Tests for configuration CLI commands."""
+
 from click.testing import CliRunner
 
 from rejoice.cli.commands import main
@@ -214,3 +215,59 @@ def test_config_list_mics_handles_missing_device_fields(monkeypatch):
     assert "Audio Input Devices" in result.output
     assert "Device 0" in result.output  # Default name when missing
     assert "USB Mic" in result.output
+
+
+def test_config_mic_chooses_and_saves_device(tmp_path, monkeypatch):
+    """GIVEN rec config mic
+    WHEN user selects a device
+    THEN device is saved to config"""
+    from unittest.mock import patch
+
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("transcription:\n  model: medium\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    with patch(
+        "rejoice.cli.config_commands.choose_microphone", return_value=1
+    ) as mock_choose:
+        with patch("rejoice.cli.config_commands.test_microphone", return_value=True):
+            with patch("rich.prompt.Confirm.ask", return_value=True):
+                runner = CliRunner()
+                result = runner.invoke(main, ["config", "mic"], input="y\n")
+
+                assert result.exit_code == 0
+                mock_choose.assert_called_once()
+                # Verify device was saved
+                import yaml
+
+                config_data = yaml.safe_load(config_file.read_text())
+                assert config_data["audio"]["device"] == "1"
+
+
+def test_config_mic_skips_test_when_user_declines(tmp_path, monkeypatch):
+    """GIVEN rec config mic
+    WHEN user declines to test
+    THEN device is still saved"""
+    from unittest.mock import patch
+
+    config_dir = tmp_path / ".config" / "rejoice"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("transcription:\n  model: medium\n")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+    with patch("rejoice.cli.config_commands.choose_microphone", return_value="default"):
+        with patch("rich.prompt.Confirm.ask", return_value=False):
+            runner = CliRunner()
+            result = runner.invoke(main, ["config", "mic"])
+
+            assert result.exit_code == 0
+            # Verify device was saved even without test
+            import yaml
+
+            config_data = yaml.safe_load(config_file.read_text())
+            assert config_data["audio"]["device"] == "default"

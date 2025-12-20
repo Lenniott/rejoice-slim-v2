@@ -166,7 +166,37 @@ else
     echo -e "${YELLOW}⚠️  Installation test inconclusive (command may not be fully configured yet)${NC}"
 fi
 
-# 8. Success message
+# 8. Run first-time setup
+echo ""
+echo "⚙️  Running first-time setup..."
+echo ""
+# Run setup using the installed rec command
+# Import and run setup directly to avoid any CLI recursion
+"$INSTALL_DIR/venv/bin/python" -c "
+import sys
+from rejoice.setup import run_first_setup
+try:
+    run_first_setup()
+except SystemExit as e:
+    sys.exit(e.code if e.code else 0)  # Exit with code, 0 if None
+except KeyboardInterrupt:
+    print('Setup cancelled by user')
+    sys.exit(0)
+except Exception as e:
+    print(f'Setup error: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+" 2>&1
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo -e "${GREEN}✓${NC} Setup completed"
+else
+    echo -e "${YELLOW}⚠️  Setup was cancelled or had issues. You can run it later with: rec config mic${NC}"
+fi
+
+# 9. Success message
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "${GREEN}✅ Rejoice v2 installed successfully!${NC}"
@@ -182,8 +212,9 @@ echo ""
 echo "   3. Start recording:"
 echo "      rec"
 echo ""
-echo "   4. First time setup (optional):"
-echo "      rec settings"
+echo "   4. Configure settings (if needed):"
+echo "      rec config mic    # Change microphone"
+echo "      rec config show   # View all settings"
 echo ""
 echo "📚 For help:"
 echo "   rec --help"

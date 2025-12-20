@@ -1,4 +1,5 @@
 """CLI commands for Rejoice."""
+
 from __future__ import annotations
 
 import tempfile
@@ -42,15 +43,15 @@ def _default_wait_for_stop() -> None:
 
     Currently implemented as a simple keypress prompt; later stories
     ([R-007], [R-008]) build on this for richer control.
+
+    Note: This function is not used when Live display is active.
+    Input is handled in a separate thread in start_recording_session().
     """
-    # Note: The prompt is now shown in the Rich Live display panel
-    # Use input() instead of click.getchar() for more reliable Enter key detection
-    # input() blocks until Enter is pressed and works consistently across platforms
+    # Simple input() - when Live uses alternate screen (screen=True),
+    # input() works correctly because it reads from the original terminal
     try:
         input()
     except (EOFError, KeyboardInterrupt):
-        # Handle cases where stdin is not available or interrupted
-        # This will be caught by the outer KeyboardInterrupt handler
         raise
 
 
@@ -152,44 +153,71 @@ def start_recording_session(
 
     cancelled = False
 
+    # Display with Live - use screen=True for alternate screen
+    # (prevents duplicate panels)
+    # Input handling in separate thread that reads from original terminal
+    enter_pressed = threading.Event()
+
+    def _wait_for_enter_input():
+        """Wait for Enter in separate thread - reads from original terminal."""
+        try:
+            # When Live uses screen=True, it uses alternate screen buffer
+            # input() reads from the original terminal, so it works correctly
+            input()
+            enter_pressed.set()
+        except (EOFError, KeyboardInterrupt):
+            enter_pressed.set()
+            raise
+
+    # Start input thread
+    input_thread = threading.Thread(target=_wait_for_enter_input, daemon=True)
+    input_thread.start()
+
     # Display thread for Rich Live panel
     def _display_recording_status():
         """Display live recording status with elapsed time and audio level."""
-        with Live(console=console, auto_refresh=False, screen=False) as live:
-            while recording_active.is_set():
-                elapsed = time.time() - start_time
-                minutes, seconds = divmod(int(elapsed), 60)
+        try:
+            with Live(
+                console=console, auto_refresh=True, screen=True, transient=False
+            ) as live:
+                while recording_active.is_set() and not enter_pressed.is_set():
+                    elapsed = time.time() - start_time
+                    minutes, seconds = divmod(int(elapsed), 60)
 
-                with audio_level_lock:
-                    current_level = audio_level_state["value"]
+                    with audio_level_lock:
+                        current_level = audio_level_state["value"]
 
-                # Create audio level bars (0-20 bars)
-                num_bars = int(current_level * 20)
-                level_bars = "█" * num_bars + "░" * (20 - num_bars)
+                    # Create audio level bars (0-20 bars)
+                    num_bars = int(current_level * 20)
+                    level_bars = "█" * num_bars + "░" * (20 - num_bars)
 
-                panel_content = (
-                    f"🔴 Recording...\n"
-                    f"⏱️  {minutes:02d}:{seconds:02d}\n"
-                    f"🎤 [{level_bars}]\n\n"
-                    f"Press Enter to stop recording."
-                )
+                    panel_content = (
+                        f"🔴 Recording...\n"
+                        f"⏱️  {minutes:02d}:{seconds:02d}\n"
+                        f"🎤 [{level_bars}]\n\n"
+                        f"Press Enter to stop recording."
+                    )
 
-                panel = Panel(
-                    panel_content,
-                    title="Rejoice",
-                    border_style="red",
-                )
-                live.update(panel)
-                live.refresh()
-                time.sleep(0.1)  # Update 10 times per second for smooth display
+                    panel = Panel(
+                        panel_content,
+                        title="Rejoice",
+                        border_style="red",
+                    )
+                    live.update(panel)
+                    time.sleep(0.1)  # Update 10 times per second for smooth display
+        finally:
+            # Ensure Live context exits cleanly
+            pass
 
     display_thread = threading.Thread(target=_display_recording_status, daemon=True)
     display_thread.start()
 
     try:
-        # 3. Wait for stop signal (keypress)
+        # 3. Wait for stop signal (Enter key detected in input thread)
         try:
-            wait_for_stop()
+            # Wait for enter_pressed event (set by input thread)
+            while not enter_pressed.is_set() and recording_active.is_set():
+                time.sleep(0.1)
         except KeyboardInterrupt:
             # Handle Ctrl+C as a cancel signal for [R-008].
             cancelled = True
@@ -206,8 +234,10 @@ def start_recording_session(
     finally:
         # 4. Stop recording immediately
         recording_active.clear()
+        enter_pressed.set()  # Signal display thread to stop
 
-        # Clean up audio stream and WAV file
+        # CRITICAL: Close audio stream and WAV file FIRST
+        # This ensures the file is properly flushed and closed before transcription
         try:
             stream.stop()
             stream.close()
@@ -221,8 +251,12 @@ def start_recording_session(
         except Exception:  # pragma: no cover - defensive cleanup
             pass
 
-        # Wait for display thread to finish
-        display_thread.join(timeout=1.0)
+        # Wait for display thread to finish (with timeout)
+        # Only call join once - removed duplicate
+        display_thread.join(timeout=0.5)
+
+        # If display thread is still alive, it's a daemon so it will be killed
+        # Don't block forever waiting for it
 
         console.print("\n⏹️  Stopping recording...")
 
@@ -429,8 +463,13 @@ def _split_frontmatter(content: str) -> tuple[str, str]:
     metavar="CODE",
     help="Force transcription language (e.g. en, es, fr).",
 )
+@click.option(
+    "--skip-setup",
+    is_flag=True,
+    help="Skip first-run setup check (for advanced users)",
+)
 @click.pass_context
-def main(ctx, version, debug, language):
+def main(ctx, version, debug, language, skip_setup):
     """Rejoice - Local voice transcription tool.
 
     Run 'rec' to start recording.
@@ -445,6 +484,9 @@ def main(ctx, version, debug, language):
 
     if debug:
         console.print("[yellow]Debug mode enabled[/yellow]")
+
+    # Note: Setup is now run during installation, not on first run
+    # Users can run 'rec config mic' or other config commands to change settings
 
     # Store debug flag and language override in context for subcommands
     ctx.ensure_object(dict)

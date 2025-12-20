@@ -13,7 +13,7 @@ Record voice, get accurate transcripts with AI summaries—all local, terminal-o
 
 1. **Data Integrity Above All** - Never lose a transcript
 2. **Simplicity Over Features** - One command to start, one key to stop
-3. **Local-First, Local-Only** - No internet required (except Ollama install)
+3. **Local-First, Local-Only** - No internet required after initial model download (except Ollama install)
 4. **Transparency Over Magic** - User always knows what's happening
 5. **Boring Reliability Over Clever Features** - Code that just works
 
@@ -53,6 +53,10 @@ pip install -e ".[dev]"
 
 # Install pre-commit hooks
 pre-commit install
+
+# Download transcription model (one-time, required for local-only operation)
+# This downloads the model to local cache - after this, no internet needed
+python3 -c "from faster_whisper import WhisperModel; WhisperModel('medium', local_files_only=False)"
 
 # Run tests
 pytest

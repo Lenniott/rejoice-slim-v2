@@ -71,20 +71,29 @@ class Transcriber:
         self._last_language: Optional[str] = None
 
         try:
+            # Enforce local-only operation to comply with "all local, no cloud" vision.
+            # Models must be downloaded once (during setup) and then work offline.
             self._model = WhisperModel(
                 config.model,
                 device=device,
                 compute_type=compute_type,
+                local_files_only=True,  # Prevent runtime cloud downloads
             )
         except Exception as exc:  # pragma: no cover - exercised via error tests
             message = f"Failed to load transcription model '{config.model}': {exc}"
             logger.error(message, exc_info=True)
+            # Provide helpful guidance if model is missing
+            suggestion_msg = (
+                f"The model '{config.model}' is not available locally. "
+                "To download it initially (one-time setup), run:\n"
+                f'  python3 -c "from faster_whisper import WhisperModel; '
+                f"WhisperModel('{config.model}', local_files_only=False)\"\n"
+                "This will download the model to your local cache. "
+                "After download, the model will work offline (no cloud access)."
+            )
             raise TranscriptionError(
                 message,
-                suggestion=(
-                    "Check that the model name is valid and all dependencies are "
-                    "installed."
-                ),
+                suggestion=suggestion_msg,
             ) from exc
 
     @property

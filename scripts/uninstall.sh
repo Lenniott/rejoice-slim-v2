@@ -7,11 +7,14 @@ set -euo pipefail
 INSTALL_DIR="$HOME/.rejoice"
 VOICE_NOTES_DIR="$HOME/Documents/benjamayden/VoiceNotes"
 
+CONFIG_DIR="$HOME/.config/rejoice"
+
 cat <<EOF
 This will remove Rejoice from your system.
 
 What will be removed:
   - Rejoice virtual environment and config at: $INSTALL_DIR
+  - Configuration directory at: $CONFIG_DIR
   - Shell aliases for the 'rec' command (bash, zsh, fish)
 
 What will NOT be removed:
@@ -31,7 +34,7 @@ esac
 
 echo "Removing Rejoice installation..."
 
-# 1. Remove virtual environment and config directory
+# 1. Remove virtual environment and install directory
 if [ -d "$INSTALL_DIR" ]; then
     rm -rf "$INSTALL_DIR"
     echo "✓ Removed $INSTALL_DIR"
@@ -39,7 +42,15 @@ else
     echo "- No install directory found at $INSTALL_DIR"
 fi
 
-# 2. Remove shell aliases from common shell rc files
+# 2. Remove configuration directory (triggers first-run setup on reinstall)
+if [ -d "$CONFIG_DIR" ]; then
+    rm -rf "$CONFIG_DIR"
+    echo "✓ Removed $CONFIG_DIR"
+else
+    echo "- No config directory found at $CONFIG_DIR"
+fi
+
+# 3. Remove shell aliases from common shell rc files
 remove_alias_from_file() {
     local rc_file="$1"
 

@@ -3400,20 +3400,20 @@ fi
 ### [I-007] First-Run Setup
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [I-004, S-002]
 
 **User Story:**
 As a new user, I want guided setup so that Rejoice is configured correctly on first use.
 
 **Acceptance Criteria:**
-- [ ] Detect first run (no config file)
-- [ ] Welcome message
-- [ ] Test microphone
-- [ ] Choose save location
-- [ ] Download default Whisper model
-- [ ] Test Ollama (optional)
-- [ ] Create sample transcript
+- [x] Detect first run (no config file)
+- [x] Welcome message
+- [x] Test microphone
+- [x] Choose save location
+- [x] Choose and download Whisper model (if not already downloaded)
+- [x] Test Ollama (optional)
+- [x] Create sample transcript
 
 **Technical Notes:**
 ```python

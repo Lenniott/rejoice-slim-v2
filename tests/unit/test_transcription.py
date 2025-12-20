@@ -32,11 +32,16 @@ def test_transcriber_initialises_model_with_config(monkeypatch):
 
     class DummyModel:
         def __init__(
-            self, model_size: str, device: str = "cpu", compute_type: str = "int8"
+            self,
+            model_size: str,
+            device: str = "cpu",
+            compute_type: str = "int8",
+            local_files_only: bool = False,
         ):
             created["model_size"] = model_size
             created["device"] = device
             created["compute_type"] = compute_type
+            created["local_files_only"] = local_files_only
 
         def transcribe(self, *args, **kwargs):  # pragma: no cover - not used here
             return [], {}
@@ -51,6 +56,7 @@ def test_transcriber_initialises_model_with_config(monkeypatch):
     assert created["model_size"] == "small"
     assert created["device"] == "cpu"
     assert created["compute_type"] == "int8"
+    assert created["local_files_only"] is True  # Enforced for local-only operation
 
 
 def test_transcribe_file_yields_normalised_segments_and_uses_vad_and_language(
