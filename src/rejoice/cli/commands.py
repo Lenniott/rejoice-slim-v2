@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 import time
 import wave
 from pathlib import Path
@@ -10,7 +11,10 @@ from typing import Optional
 import click
 import numpy as np
 from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TimeElapsedColumn
 from rich.prompt import Confirm
 from rich.table import Table
 
@@ -21,11 +25,12 @@ from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
 from rejoice.exceptions import TranscriptError
 from rejoice.transcription import Transcriber
-from rejoice.transcription.realtime import RealtimeTranscriptionWorker
 from rejoice.transcript.manager import (
     TRANSCRIPT_FILENAME_PATTERN,
+    append_to_transcript,
     create_transcript,
     normalize_id,
+    update_language,
     update_status,
 )
 
@@ -38,7 +43,7 @@ def _default_wait_for_stop() -> None:
     Currently implemented as a simple keypress prompt; later stories
     ([R-007], [R-008]) build on this for richer control.
     """
-    console.print("[bold]Press Enter to stop recording.[/bold]")
+    # Note: The prompt is now shown in the Rich Live display panel
     # Use input() instead of click.getchar() for more reliable Enter key detection
     # input() blocks until Enter is pressed and works consistently across platforms
     try:
@@ -49,26 +54,40 @@ def _default_wait_for_stop() -> None:
         raise
 
 
+def _calculate_audio_level(audio_chunk: np.ndarray) -> float:
+    """Calculate RMS audio level for visual meter.
+
+    Returns a normalized value between 0.0 and 1.0 representing audio level.
+    """
+    if len(audio_chunk) == 0:
+        return 0.0
+    # Calculate RMS (Root Mean Square) for audio level
+    rms = float(np.sqrt(np.mean(audio_chunk**2)))
+    # Normalize to 0-1 range (assuming input is typically -1.0 to 1.0)
+    # Clamp to prevent values > 1.0 from causing display issues
+    # Scale: 0.5 RMS = full bar (so rms/0.5 gives 0-2 range, min caps at 1.0)
+    return min(1.0, rms / 0.5)
+
+
 def start_recording_session(
     *,
     wait_for_stop=_default_wait_for_stop,
     language_override: Optional[str] = None,
 ):
-    """Start a recording session implementing [R-006] Recording Control - Start,
-    [T-009] Connect Recording to Transcription, and [T-010] Real-Time Incremental
-    Transcription During Recording.
+    """Start a recording session implementing [R-012] Simplified Recording.
+
+    Provides visual feedback during recording with Rich Live display.
 
     Steps:
     - Load configuration
     - Immediately create a transcript file (zero data loss)
     - Create temporary WAV file for audio capture
-    - Initialize real-time transcription worker
-    - Start audio capture using the configured device and sample rate
-    - Write audio data to temporary WAV file and feed to real-time transcription
+    - Start audio capture with visual feedback (Rich Live display)
+    - Show recording indicator, elapsed time, and audio level meter
     - Block until ``wait_for_stop`` returns
-    - Stop real-time transcription worker
-    - Clean up the audio stream and display basic duration information
-    - If not cancelled, run final transcription pass on remaining audio
+    - Stop recording immediately
+    - Run single transcription pass with progress bar
+    - Write final transcript atomically
     - Clean up temporary audio file
 
     Args:
@@ -106,28 +125,23 @@ def start_recording_session(
     wav_file.setsampwidth(2)  # 16-bit
     wav_file.setframerate(config.audio.sample_rate)  # 16kHz
 
-    # 3. Initialize real-time transcription worker [T-010]
-    transcriber = Transcriber(config.transcription)
-    realtime_worker = RealtimeTranscriptionWorker(
-        transcriber=transcriber,
-        transcript_path=filepath,
-        sample_rate=config.audio.sample_rate,
-        min_chunk_size_seconds=1.0,  # Process chunks every 1 second
-    )
-    realtime_worker.start()
-
-    # 4. Start audio capture
+    # Shared state for display thread
+    recording_active = threading.Event()
+    recording_active.set()
     start_time = time.time()
+    audio_level_state = {"value": 0.0}
+    audio_level_lock = threading.Lock()
 
     def _audio_callback(indata, frames, timing, status):  # pragma: no cover
-        # Write audio buffer to WAV file (for final pass)
+        # Write audio buffer to WAV file
         # Convert float32 to int16 PCM
         audio_int16 = (indata * 32767).astype(np.int16)
         wav_file.writeframes(audio_int16.tobytes())
 
-        # Feed audio chunk to real-time transcription worker [T-010]
-        # Convert to float32 if needed (indata should already be float32)
-        realtime_worker.add_audio_chunk(indata.flatten())
+        # Calculate audio level for meter
+        level = _calculate_audio_level(indata.flatten())
+        with audio_level_lock:
+            audio_level_state["value"] = level
 
     stream = record_audio(
         _audio_callback,
@@ -138,8 +152,42 @@ def start_recording_session(
 
     cancelled = False
 
+    # Display thread for Rich Live panel
+    def _display_recording_status():
+        """Display live recording status with elapsed time and audio level."""
+        with Live(console=console, auto_refresh=False, screen=False) as live:
+            while recording_active.is_set():
+                elapsed = time.time() - start_time
+                minutes, seconds = divmod(int(elapsed), 60)
+
+                with audio_level_lock:
+                    current_level = audio_level_state["value"]
+
+                # Create audio level bars (0-20 bars)
+                num_bars = int(current_level * 20)
+                level_bars = "█" * num_bars + "░" * (20 - num_bars)
+
+                panel_content = (
+                    f"🔴 Recording...\n"
+                    f"⏱️  {minutes:02d}:{seconds:02d}\n"
+                    f"🎤 [{level_bars}]\n\n"
+                    f"Press Enter to stop recording."
+                )
+
+                panel = Panel(
+                    panel_content,
+                    title="Rejoice",
+                    border_style="red",
+                )
+                live.update(panel)
+                live.refresh()
+                time.sleep(0.1)  # Update 10 times per second for smooth display
+
+    display_thread = threading.Thread(target=_display_recording_status, daemon=True)
+    display_thread.start()
+
     try:
-        # 5. Wait for stop signal (keypress)
+        # 3. Wait for stop signal (keypress)
         try:
             wait_for_stop()
         except KeyboardInterrupt:
@@ -156,10 +204,10 @@ def start_recording_session(
             ):
                 cancelled = False
     finally:
-        # 6. Stop real-time transcription worker [T-010]
-        realtime_worker.stop(timeout=5.0)
+        # 4. Stop recording immediately
+        recording_active.clear()
 
-        # 7. Clean up audio stream and WAV file
+        # Clean up audio stream and WAV file
         try:
             stream.stop()
             stream.close()
@@ -173,9 +221,10 @@ def start_recording_session(
         except Exception:  # pragma: no cover - defensive cleanup
             pass
 
-        duration_seconds = int(time.time() - start_time)
-        minutes, seconds = divmod(duration_seconds, 60)
-        console.print(f"⏱️  Duration: {minutes:d}:{seconds:02d}")
+        # Wait for display thread to finish
+        display_thread.join(timeout=1.0)
+
+        console.print("\n⏹️  Stopping recording...")
 
     if cancelled:
         # Offer optional deletion, but default to keeping the file marked
@@ -206,24 +255,73 @@ def start_recording_session(
         except Exception:  # pragma: no cover - defensive cleanup
             pass
     else:
-        # 8. Finalise the transcript frontmatter to reflect a completed recording.
-        update_status(filepath, "completed")
-        console.print(
-            "\n✅ Recording stopped. Transcript marked as [bold]completed[/bold].",
-        )
-
-        # 9. Run final transcription pass on remaining audio [T-010]
-        # This catches any audio that wasn't processed by real-time worker
+        # 5. Run single transcription pass with progress bar
+        console.print("\n🔄 Transcribing...")
         try:
-            console.print("🔄 Running final transcription pass...")
-            realtime_worker.finalize(remaining_audio_path=temp_audio_path)
-            console.print("✅ Final transcription pass complete.")
+            # Suppress verbose INFO logs from faster-whisper, huggingface, httpx
+            # These libraries log model downloads/checks which are noisy
+            # Note: Models are cached locally - HTTP request is just a version
+            # check, not a download
+            import logging
+
+            # Get root logger and its console handler
+            root_logger = logging.getLogger()
+            console_handler = None
+            original_console_level = None
+            for handler in root_logger.handlers:
+                # Find the RichHandler (console handler)
+                if hasattr(handler, "rich_tracebacks"):
+                    console_handler = handler
+                    original_console_level = handler.level
+                    # Temporarily suppress INFO logs on console
+                    handler.setLevel(logging.WARNING)
+                    break
+
+            # Also suppress at logger level for noisy libraries
+            noisy_loggers = [
+                "faster_whisper",
+                "huggingface_hub",
+                "httpx",
+                "httpcore",
+            ]
+            for logger_name in noisy_loggers:
+                logger = logging.getLogger(logger_name)
+                logger.setLevel(logging.WARNING)
+
+            try:
+                transcriber = Transcriber(config.transcription)
+                segments = []
+
+                with Progress(
+                    BarColumn(),
+                    TimeElapsedColumn(),
+                    console=console,
+                ) as progress:
+                    progress.add_task("Transcribing", total=None)
+                    for segment in transcriber.transcribe_file(str(temp_audio_path)):
+                        text = str(segment.get("text", "")).strip()
+                        if text:
+                            segments.append(text)
+
+                # Write final transcript atomically
+                if segments:
+                    final_text = " ".join(segments)
+                    append_to_transcript(filepath, final_text)
+
+                # Update language in frontmatter if detected
+                if transcriber.last_language:
+                    update_language(filepath, transcriber.last_language)
+            finally:
+                # Restore console handler level
+                if console_handler and original_console_level is not None:
+                    console_handler.setLevel(original_console_level)
+                # Restore loggers to use parent logger's level
+                # (NOTSET = inherit from root)
+                for logger_name in noisy_loggers:
+                    logging.getLogger(logger_name).setLevel(logging.NOTSET)
+
         except Exception as e:  # pragma: no cover - defensive error handling
-            # Log error but don't crash - real-time transcription may have already
-            # processed most of the audio
-            console.print(
-                f"[yellow]Warning: Final transcription pass failed: {e}[/yellow]"
-            )
+            console.print(f"[yellow]Warning: Transcription failed: {e}[/yellow]")
         finally:
             # Always clean up temp audio file
             try:
@@ -231,7 +329,9 @@ def start_recording_session(
             except Exception:  # pragma: no cover - defensive cleanup
                 pass
 
-        console.print(f"📄 File saved at: {filepath}")
+        # 6. Finalise the transcript frontmatter to reflect a completed recording.
+        update_status(filepath, "completed")
+        console.print(f"✅ Transcript saved: {filepath}")
 
     return filepath, transcript_id
 

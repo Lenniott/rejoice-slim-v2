@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [R-012] Simplified Recording with Visual Feedback
+  - Implemented Rich Live display showing recording status, elapsed time (MM:SS), and audio level meter (visual bars) during recording.
+  - Removed real-time transcription complexity - recording now uses a simple record-then-transcribe flow.
+  - After recording stops, a single transcription pass runs with progress bar using faster-whisper.
+  - Final transcript is written atomically using `append_to_transcript`.
+  - Temporary WAV file is cleaned up after transcription completes.
+  - Updated existing tests to reflect the simplified flow (removed RealtimeTranscriptionWorker dependencies).
+  - Visual feedback provides clear indication that the system is working without the complexity of real-time transcription.
+
+### Added
+
 - [R-005] ID Normalization System
   - Introduced a `normalize_id` helper in `transcript/manager.py` to convert flexible numeric input like `"1"`, `"01"` or `"000001"` into the canonical zero-padded 6-digit transcript ID.
   - Added unit tests covering valid formats, non-numeric inputs, and out-of-range values (zero, negative and too-large IDs), keeping transcript ID handling predictable and safe for future CLI commands.

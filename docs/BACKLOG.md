@@ -959,6 +959,158 @@ As a user, I want transcript IDs at the start of filenames so that files are alw
 
 ---
 
+### [R-012] Simplified Recording with Visual Feedback
+**Priority:** High
+**Estimate:** M (4-8h)
+**Status:** ✅ Done
+**Dependencies:** [R-006, R-002]
+
+**User Story:**
+As a user, I want clear visual feedback during recording so that I know the system is working, without the complexity of real-time transcription. After I stop recording, I want a single accurate transcription pass with clear progress indication.
+
+**Example Terminal Output:**
+```bash
+$ rec
+
+🎙️  Recording started (ID 000054)
+📄  Transcript: /Users/benjamin/Documents/transcripts/transcript_20251220_000054.md
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Rejoice                                                                          ┃
+┃                                                                                  ┃
+┃ 🔴 Recording...                                                                  ┃
+┃ ⏱️  00:05                                                                         ┃
+┃ 🎤 [████████████░░░░░░░░]                                                        ┃
+┃                                                                                  ┃
+┃ Press Enter to stop recording.                                                  ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+[User presses Enter]
+
+⏹️  Stopping recording...
+
+🔄 Transcribing...
+Transcribing... ████████████████████████████████████████ 100% 0:03.2
+
+✅ Transcript saved: /Users/benjamin/Documents/transcripts/transcript_20251220_000054.md
+```
+
+**Acceptance Criteria:**
+- [x] Show "🔴 Recording..." indicator during recording
+- [x] Display elapsed time in MM:SS format, updating every second
+- [x] Show audio level meter (visual bars) to confirm microphone is working
+- [x] Use Rich Live display for smooth updates without flicker
+- [x] When Enter is pressed, immediately stop recording and close WAV file
+- [x] Show "Transcribing..." with progress bar during single transcription pass
+- [x] Transcribe complete WAV file using faster-whisper (single pass, no duplication)
+- [x] Write final transcript to file atomically
+- [x] Clean up temporary WAV file after transcription
+- [x] No real-time transcription complexity - just record, then transcribe
+
+**Technical Notes:**
+```python
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress, BarColumn, TimeElapsedColumn
+import numpy as np
+
+def calculate_audio_level(audio_chunk: np.ndarray) -> float:
+    """Calculate RMS audio level for visual meter."""
+    return np.sqrt(np.mean(audio_chunk**2))
+
+def show_recording_display(filepath, start_time, audio_level_callback):
+    """Display live recording status with elapsed time and audio level."""
+    with Live(auto_refresh=False) as live:
+        while recording:
+            elapsed = time.time() - start_time
+            minutes, seconds = divmod(int(elapsed), 60)
+            audio_level = audio_level_callback()
+
+            # Create audio level bars (0-20 bars)
+            level_bars = "█" * int(audio_level * 20)
+
+            panel = Panel(
+                f"🔴 Recording...\n"
+                f"⏱️  {minutes:02d}:{seconds:02d}\n"
+                f"🎤 [{level_bars:<20}]",
+                title="Rejoice",
+                border_style="red"
+            )
+            live.update(panel)
+            time.sleep(0.1)  # Update 10 times per second for smooth display
+
+def record_and_transcribe():
+    """Simplified flow: record to WAV, then transcribe."""
+    # 1. Create transcript file
+    filepath, tid = create_transcript(save_dir)
+
+    # 2. Start recording with visual feedback
+    start_time = time.time()
+    audio_level = 0.0
+
+    def audio_callback(indata, frames, timing, status):
+        nonlocal audio_level
+        # Write to WAV file
+        wav_file.writeframes(convert_to_int16(indata))
+        # Calculate audio level for meter
+        audio_level = calculate_audio_level(indata)
+
+    stream = record_audio(audio_callback, ...)
+
+    # Show live display in separate thread
+    display_thread = threading.Thread(
+        target=show_recording_display,
+        args=(filepath, start_time, lambda: audio_level),
+        daemon=True
+    )
+    display_thread.start()
+
+    # Wait for Enter
+    wait_for_stop()
+
+    # Stop recording immediately
+    stream.stop()
+    stream.close()
+    wav_file.close()
+
+    # Single transcription pass with progress
+    console.print("\n🔄 Transcribing...")
+    with Progress(
+        BarColumn(),
+        TimeElapsedColumn(),
+        console=console
+    ) as progress:
+        task = progress.add_task("Transcribing", total=None)
+        transcriber = Transcriber(config.transcription)
+        segments = []
+        for segment in transcriber.transcribe_file(str(wav_file_path)):
+            text = segment.get("text", "").strip()
+            if text:
+                segments.append(text)
+
+        # Write final transcript
+        final_text = " ".join(segments)
+        append_to_transcript(filepath, final_text)
+
+    # Clean up
+    temp_audio_path.unlink()
+    console.print(f"✅ Transcript saved: {filepath}")
+```
+
+
+
+**Test Requirements:**
+- Test recording display updates correctly
+- Test elapsed time increments properly
+- Test audio level meter responds to input
+- Test Enter key stops recording immediately
+- Test single transcription pass completes successfully
+- Test WAV file is cleaned up after transcription
+- Test transcript file contains final accurate text (no duplication)
+- Integration test: full recording → transcription → file verification
+
+---
+
 ## Phase 3: Transcription System (Week 3)
 
 ### [T-001] faster-whisper Integration

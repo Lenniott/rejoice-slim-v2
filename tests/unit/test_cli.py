@@ -174,7 +174,10 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
 def test_default_wait_for_stop_uses_enter_and_input(monkeypatch, capsys):
     """GIVEN the default wait_for_stop implementation
     WHEN it is invoked
-    THEN it prompts for Enter and calls input().
+    THEN it calls input() to wait for Enter key.
+
+    Note: The prompt message is now shown in the Rich Live display panel
+    (see [R-012]), so this function itself doesn't print anything.
     """
     calls = {"input_called": False}
 
@@ -187,8 +190,7 @@ def test_default_wait_for_stop_uses_enter_and_input(monkeypatch, capsys):
 
     _default_wait_for_stop()
 
-    captured = capsys.readouterr()
-    assert "Press Enter to stop recording." in captured.out
+    # Verify input() was called (the prompt is shown in Rich Live display, not here)
     assert calls["input_called"] is True
 
 
@@ -792,18 +794,15 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
     def fake_wait_for_stop() -> None:
         pass
 
-    # Mock Transcriber with transcribe_file for real-time worker
+    # Mock Transcriber for single transcription pass
     class FakeTranscriber:
         def __init__(self, config):
             events.append(("transcriber_init", config.language))
+            self.last_language = None
 
         def transcribe_file(self, audio_path):
             events.append(("transcribe_file", audio_path))
             # Yield a dummy segment
-            yield {"text": "Hello world", "start": 0.0, "end": 1.0}
-
-        def stream_file_to_transcript(self, audio_path, transcript_path):
-            events.append(("transcribe", audio_path, transcript_path))
             yield {"text": "Hello world", "start": 0.0, "end": 1.0}
 
     monkeypatch.setattr(
@@ -819,30 +818,12 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
         lambda path, status: None,
     )
     monkeypatch.setattr(
+        "rejoice.cli.commands.append_to_transcript",
+        lambda path, text: events.append(("append_to_transcript", path, text)),
+    )
+    monkeypatch.setattr(
         "rejoice.cli.commands.Transcriber",
         FakeTranscriber,
-    )
-
-    # Mock RealtimeTranscriptionWorker to track finalize calls
-    class FakeRealtimeWorker:
-        def __init__(self, *args, **kwargs):
-            events.append("realtime_worker_init")
-
-        def start(self):
-            events.append("realtime_worker_start")
-
-        def stop(self, timeout=None):
-            events.append("realtime_worker_stop")
-
-        def add_audio_chunk(self, chunk):
-            pass
-
-        def finalize(self, remaining_audio_path=None):
-            events.append(("realtime_finalize", remaining_audio_path))
-
-    monkeypatch.setattr(
-        "rejoice.cli.commands.RealtimeTranscriptionWorker",
-        FakeRealtimeWorker,
     )
 
     # Mock tempfile and wave
@@ -903,12 +884,15 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
 
     start_recording_session(wait_for_stop=fake_wait_for_stop)
 
-    # Verify real-time transcription worker was initialized and finalize was called
-    assert "realtime_worker_init" in events
-    assert "realtime_worker_start" in events
-    assert "realtime_worker_stop" in events
+    # Verify single transcription pass was run (no real-time worker)
+    assert ("transcriber_init", "auto") in events
     assert any(
-        event[0] == "realtime_finalize" for event in events if isinstance(event, tuple)
+        event[0] == "transcribe_file" for event in events if isinstance(event, tuple)
+    )
+    assert any(
+        event[0] == "append_to_transcript"
+        for event in events
+        if isinstance(event, tuple)
     )
 
 
@@ -948,32 +932,18 @@ def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
     def fake_wait_for_stop() -> None:
         pass
 
-    # Mock Transcriber that yields segments for real-time worker
-    from rejoice.transcript.manager import append_to_transcript
-
+    # Mock Transcriber that yields segments for single transcription pass
     class FakeTranscriber:
         def __init__(self, config):
-            pass
+            self.last_language = None
 
         def transcribe_file(self, audio_path):
-            # Yield segments for real-time worker (used in finalize)
+            # Yield segments for single transcription pass
             segments = [
                 {"text": "First segment", "start": 0.0, "end": 1.0},
                 {"text": "Second segment", "start": 1.0, "end": 2.0},
             ]
             for segment in segments:
-                yield segment
-
-        def stream_file_to_transcript(self, audio_path, transcript_path):
-            # Not used in real-time transcription, but kept for compatibility
-            segments = [
-                {"text": "First segment", "start": 0.0, "end": 1.0},
-                {"text": "Second segment", "start": 1.0, "end": 2.0},
-            ]
-            for segment in segments:
-                text = str(segment.get("text", "")).strip()
-                if text:
-                    append_to_transcript(transcript_path, text)
                 yield segment
 
     monkeypatch.setattr(
@@ -995,36 +965,6 @@ def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.Transcriber",
         FakeTranscriber,
-    )
-
-    # Mock RealtimeTranscriptionWorker to actually append text during finalize
-    class FakeRealtimeWorker:
-        def __init__(self, transcriber, transcript_path, **kwargs):
-            self.transcriber = transcriber
-            self.transcript_path = transcript_path
-
-        def start(self):
-            pass
-
-        def stop(self, timeout=None):
-            pass
-
-        def add_audio_chunk(self, chunk):
-            pass
-
-        def finalize(self, remaining_audio_path=None):
-            # Actually call transcribe_file and append segments
-            if remaining_audio_path:
-                for segment in self.transcriber.transcribe_file(
-                    str(remaining_audio_path)
-                ):
-                    text = str(segment.get("text", "")).strip()
-                    if text:
-                        append_to_transcript(self.transcript_path, text)
-
-    monkeypatch.setattr(
-        "rejoice.cli.commands.RealtimeTranscriptionWorker",
-        FakeRealtimeWorker,
     )
 
     # Mock tempfile and wave
@@ -1129,9 +1069,9 @@ def test_temp_file_cleanup_on_success(monkeypatch, tmp_path):
 
     class FakeTranscriber:
         def __init__(self, config):
-            pass
+            self.last_language = None
 
-        def stream_file_to_transcript(self, audio_path, transcript_path):
+        def transcribe_file(self, audio_path):
             yield {"text": "Test", "start": 0.0, "end": 1.0}
 
     monkeypatch.setattr(
@@ -1149,6 +1089,10 @@ def test_temp_file_cleanup_on_success(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.update_status",
         lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.append_to_transcript",
+        lambda path, text: None,
     )
     monkeypatch.setattr(
         "rejoice.cli.commands.Transcriber",
@@ -1255,9 +1199,9 @@ def test_transcription_error_handled_gracefully(monkeypatch, tmp_path):
 
     class FakeTranscriber:
         def __init__(self, config):
-            pass
+            self.last_language = None
 
-        def stream_file_to_transcript(self, audio_path, transcript_path):
+        def transcribe_file(self, audio_path):
             raise TranscriptionError(
                 "Transcription failed", suggestion="Check audio file"
             )
@@ -1389,10 +1333,6 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
             events.append("transcribe_file_called")
             yield {"text": "Should not appear", "start": 0.0, "end": 1.0}
 
-        def stream_file_to_transcript(self, audio_path, transcript_path):
-            events.append("transcribe_called")
-            yield {"text": "Should not appear", "start": 0.0, "end": 1.0}
-
     monkeypatch.setattr(
         "rejoice.cli.commands.load_config",
         lambda: FakeConfig(),
@@ -1416,30 +1356,6 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.Confirm.ask",
         lambda *args, **kwargs: True,  # Confirm cancellation
-    )
-
-    # Mock RealtimeTranscriptionWorker - initialized but finalize won't be called
-    class FakeRealtimeWorker:
-        def __init__(self, *args, **kwargs):
-            # Worker is initialized even for cancelled recordings
-            pass
-
-        def start(self):
-            pass
-
-        def stop(self, timeout=None):
-            pass
-
-        def add_audio_chunk(self, chunk):
-            pass
-
-        def finalize(self, remaining_audio_path=None):
-            # This should NOT be called for cancelled recordings
-            events.append("realtime_finalize_called")
-
-    monkeypatch.setattr(
-        "rejoice.cli.commands.RealtimeTranscriptionWorker",
-        FakeRealtimeWorker,
     )
 
     import tempfile
@@ -1486,12 +1402,8 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
     start_recording_session(wait_for_stop=fake_wait_for_stop)
 
     # For cancelled recordings:
-    # - Transcriber is initialized (for real-time worker), but that's okay
-    # - Final transcription pass (finalize) should NOT be called
-    # - stream_file_to_transcript should NOT be called
-    assert "transcribe_called" not in events
+    # - Transcription should NOT be called
     assert "transcribe_file_called" not in events
-    assert "realtime_finalize_called" not in events
 
 
 def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
@@ -1535,8 +1447,9 @@ def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
     class FakeTranscriber:
         def __init__(self, config):
             events.append(("transcriber_init", config.language))
+            self.last_language = None
 
-        def stream_file_to_transcript(self, audio_path, transcript_path):
+        def transcribe_file(self, audio_path):
             yield {"text": "Test", "start": 0.0, "end": 1.0}
 
     monkeypatch.setattr(
@@ -1554,6 +1467,10 @@ def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "rejoice.cli.commands.update_status",
         lambda path, status: None,
+    )
+    monkeypatch.setattr(
+        "rejoice.cli.commands.append_to_transcript",
+        lambda path, text: None,
     )
     monkeypatch.setattr(
         "rejoice.cli.commands.Transcriber",
