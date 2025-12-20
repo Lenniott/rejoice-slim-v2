@@ -8,10 +8,10 @@
 
 ## 📊 Progress Overview
 
-- **Total Stories:** 83
+- **Total Stories:** 84
 - **Completed:** 24
 - **In Progress:** 0
-- **Not Started:** 59
+- **Not Started:** 60
 
 ---
 
@@ -39,16 +39,22 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 
 **MMP (Minimum Marketable Product) – Makes it pleasant for everyday use**
 
+- Installation & setup:
+  - ❌ [I-007], ❌ [I-008]
 - Recording polish:
-  - ❌ [R-009], ❌ [R-010]
+  - ❌ [R-010], ❌ [R-011]
 - Transcription usability:
-  - ❌ [T-004], ❌ [T-005], ❌ [T-006]
+  - ❌ [T-004]
+- Advanced transcription features:
+  - ❌ [A-001], ❌ [A-002], ❌ [A-003], ❌ [A-004]
 - CLI quality of life:
-  - ❌ [C-002], ❌ [C-004], ❌ [C-005]
-- Settings & setup:
-  - ❌ [S-001], ❌ [S-002], ❌ [S-004]
+  - ❌ [C-004], ❌ [C-005], ❌ [C-009]
+- Settings & configuration:
+  - ❌ [S-001], ❌ [S-002], ❌ [S-003], ❌ [S-004], ❌ [S-005], ❌ [S-006], ❌ [S-007], ❌ [S-010]
 - Basic AI assist:
-  - ❌ [AI-001], ❌ [AI-003], ❌ [AI-005]
+  - ❌ [AI-001], ❌ [AI-002], ❌ [AI-004]
+- Polish & quality:
+  - ❌ [P-001], ❌ [P-002], ❌ [P-003], ❌ [P-004], ❌ [P-008]
 
 **MLP (Minimum Lovable Product) – Everything else**
 
@@ -3472,6 +3478,110 @@ with Progress() as progress:
 
 ---
 
+### [P-011] Clean Recording UI & Output Format
+**Priority:** High
+**Estimate:** M (4-8h)
+**Status:** ❌ Not Started
+**Dependencies:** [R-006, T-001, T-010]
+
+**User Story:**
+As a user, I want a clean, minimal output when recording so that I can focus on speaking without distraction from verbose logs.
+
+**Acceptance Criteria:**
+- [ ] Clean startup message: "New note starting..."
+- [ ] Show file name clearly
+- [ ] Show "Transcribe started (time)"
+- [ ] Clear instruction: "Press Enter to stop or ^C to cancel"
+- [ ] Visual indicator that recording is active (spinner or minimal indicator)
+- [ ] Suppress all INFO/DEBUG logs during recording (save to file only)
+- [ ] On stop: "Stopped at {time} total {duration}"
+- [ ] Show "Copied to clipboard" if auto-copy enabled
+- [ ] Show "Finishing up..." during final transcription
+- [ ] Final message: "File saved: {path}"
+- [ ] Fix Enter key detection (ensure stdin is not blocked)
+- [ ] No verbose faster-whisper output in console
+- [ ] No VAD/language detection spam in console
+
+**Technical Notes:**
+```python
+# Suppress console logging during recording
+# Set console handler level to WARNING during recording
+console_handler.setLevel(logging.WARNING)
+
+# Clean output format
+console.print("New note starting...")
+console.print(f"\n{filepath.name}\n")
+console.print(f"Transcribe started {start_time.strftime('%H:%M:%S')}")
+console.print("Press Enter to stop or ^C to cancel\n")
+
+# Visual indicator
+with console.status("[bold green]● Recording...", spinner="dots"):
+    wait_for_stop()
+
+# After stop
+console.print(f"\nStopped at {stop_time.strftime('%H:%M:%S')} (total {duration})")
+if auto_copy:
+    console.print("Copied to clipboard")
+console.print("\nFinishing up...")
+console.print(f'File saved: "{filepath}"')
+```
+
+**Implementation Points:**
+- Temporarily raise console log level to WARNING during recording
+- Suppress faster-whisper HTTP requests and processing logs
+- Use Rich status/spinner for visual feedback
+- Ensure `input()` works correctly (check stdin not blocked by audio stream)
+- Restore log level after recording completes
+- Keep all logs in file, just hide from console
+
+**Test Requirements:**
+- Test Enter key stops recording reliably
+- Test Ctrl+C cancels recording
+- Test output is clean and minimal
+- Test logs still written to file
+- Test with different recording durations
+- Test auto-copy message appears when enabled
+
+**Technical Notes:**
+```python
+from rich.console import Console
+from rich.spinner import Spinner
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+console = Console()
+
+# For quick operations (< 3 seconds)
+with console.status("[bold green]Loading transcription model...") as status:
+    transcriber = Transcriber(config.transcription)
+
+# For longer operations (> 3 seconds)
+with Progress(
+    SpinnerColumn(),
+    TextColumn("[progress.description]{task.description}"),
+    console=console
+) as progress:
+    task = progress.add_task("Loading model...", total=None)
+    transcriber = Transcriber(config.transcription)
+    progress.update(task, completed=100)
+```
+
+**Implementation Points:**
+- Add feedback in `start_recording_session()` before model initialization
+- Wrap `Transcriber.__init__()` with progress indicator
+- Show audio device initialization feedback
+- Consider model download progress (first-time use)
+- Keep messages concise and professional
+
+**Test Requirements:**
+- Test with cold start (model not cached)
+- Test with warm start (model cached)
+- Test with different model sizes (tiny vs large)
+- Test with slow systems (simulate slow model loading)
+- Test feedback doesn't interfere with recording start
+- Test all messages are clear and actionable
+
+---
+
 ### [P-004] Success Messaging
 **Priority:** Low
 **Estimate:** S (2-4h)
@@ -3704,14 +3814,14 @@ As the project team, we want to announce Rejoice so that users can discover it.
 
 ### By Priority
 - **Critical:** 28 stories
-- **High:** 23 stories
+- **High:** 24 stories
 - **Medium:** 28 stories
 - **Low:** 10 stories
 
 ### By Estimate
 - **XS (<2h):** 0 stories
 - **S (2-4h):** 28 stories
-- **M (4-8h):** 39 stories
+- **M (4-8h):** 40 stories
 - **L (1-2d):** 16 stories
 - **XL (2-5d):** 6 stories
 
@@ -3724,7 +3834,7 @@ As the project team, we want to announce Rejoice so that users can discover it.
 - **Phase 6 (Commands):** 10 stories
 - **Phase 7 (Settings):** 10 stories
 - **Phase 8 (Installation):** 9 stories
-- **Phase 9 (Polish):** 10 stories
+- **Phase 9 (Polish):** 11 stories
 
 ---
 
