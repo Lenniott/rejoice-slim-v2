@@ -121,7 +121,7 @@ audio:
 
 ai:
   ollama_url: http://localhost:11434
-  model: llama2
+  model: qwen3:4b
   prompts_path: ~/.config/rejoice/prompts/
 """
 

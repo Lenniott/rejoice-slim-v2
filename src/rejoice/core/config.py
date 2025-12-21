@@ -42,7 +42,7 @@ class AIConfig:
     """AI settings."""
 
     ollama_url: str = "http://localhost:11434"
-    model: str = "llama2"
+    model: str = "qwen3:4b"
     prompts_path: str = "~/.config/rejoice/prompts/"
 
 
@@ -105,7 +105,7 @@ def get_default_config() -> Dict[str, Any]:
         },
         "ai": {
             "ollama_url": "http://localhost:11434",
-            "model": "llama2",
+            "model": "qwen3:4b",
             "prompts_path": "~/.config/rejoice/prompts/",
         },
     }

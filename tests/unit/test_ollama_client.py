@@ -37,12 +37,12 @@ class TestOllamaClient:
         mock_post.return_value = mock_response
 
         client = OllamaClient()
-        result = client.generate("Test prompt", model="llama2")
+        result = client.generate("Test prompt", model="qwen3:4b")
 
         assert result == "Generated text here"
         mock_post.assert_called_once_with(
             "http://localhost:11434/api/generate",
-            json={"model": "llama2", "prompt": "Test prompt"},
+            json={"model": "qwen3:4b", "prompt": "Test prompt"},
             stream=False,
             timeout=30,
         )
@@ -129,7 +129,7 @@ class TestOllamaClient:
         mock_post.return_value = mock_response
 
         client = OllamaClient()
-        chunks = list(client.generate_streaming("Test prompt", model="llama2"))
+        chunks = list(client.generate_streaming("Test prompt", model="qwen3:4b"))
 
         assert chunks == ["Hello", " world", "!"]
         call_args = mock_post.call_args
@@ -200,7 +200,7 @@ class TestOllamaClient:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "models": [
-                {"name": "llama2:latest"},
+                {"name": "qwen3:4b:latest"},
                 {"name": "mistral:latest"},
             ]
         }
@@ -209,7 +209,7 @@ class TestOllamaClient:
         client = OllamaClient()
         models = client.list_models()
 
-        assert "llama2:latest" in models
+        assert "qwen3:4b:latest" in models
         assert "mistral:latest" in models
         mock_get.assert_called_once_with("http://localhost:11434/api/tags", timeout=5)
 

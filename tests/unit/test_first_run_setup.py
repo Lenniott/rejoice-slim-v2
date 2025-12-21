@@ -208,7 +208,7 @@ def test_test_ollama_connection_success():
     from rejoice.setup import test_ollama_connection
 
     mock_client = MagicMock()
-    mock_client.list.return_value = {"models": [{"name": "llama2"}]}
+    mock_client.list.return_value = {"models": [{"name": "qwen3:4b"}]}
 
     with patch("rejoice.setup.Ollama", return_value=mock_client):
         with patch("rejoice.setup.console"):

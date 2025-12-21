@@ -8,10 +8,10 @@
 
 ## 📊 Progress Overview
 
-- **Total Stories:** 87
+- **Total Stories:** 88
 - **Completed:** 25
 - **In Progress:** 0
-- **Not Started:** 62
+- **Not Started:** 63
 
 ---
 
@@ -418,7 +418,7 @@ audio:
 
 ai:
   ollama_url: http://localhost:11434
-  model: llama2
+  model: qwen3:4b
   prompts_path: ~/.config/rejoice/prompts/
 ```
 
@@ -2084,7 +2084,7 @@ class OllamaClient:
     def __init__(self, base_url='http://localhost:11434'):
         self.base_url = base_url
 
-    def generate(self, prompt, model='llama2'):
+    def generate(self, prompt, model='qwen3:4b'):
         response = requests.post(
             f'{self.base_url}/api/generate',
             json={'model': model, 'prompt': prompt}
@@ -3164,7 +3164,7 @@ As a user, I want to configure Ollama settings so that AI features work with my 
 
 **Acceptance Criteria:**
 - [ ] Set Ollama URL (default: localhost:11434)
-- [ ] Set default model (llama2, mistral, etc.)
+- [ ] Set default model (qwen3:4b, mistral, etc.)
 - [ ] Test connection
 - [ ] List available models
 
@@ -3312,6 +3312,215 @@ if debug:
 - Test with each command
 - Test logging levels
 - Test timing information
+
+---
+
+### [S-011] Comprehensive Debug Logging
+**Priority:** High
+**Estimate:** M (4-8h)
+**Status:** ❌ Not Started
+**Dependencies:** [F-006, S-010]
+
+**User Story:**
+As a developer, I want comprehensive DEBUG-level logging throughout the codebase so that when I use `--debug`, I can actually see what the application is doing and troubleshoot issues effectively.
+
+**Acceptance Criteria:**
+- [ ] Configuration loading logged (config file path, values loaded, defaults used)
+- [ ] Audio device selection logged (device name, index, sample rate, channels)
+- [ ] Recording lifecycle logged (start, stop, duration, audio level metrics)
+- [ ] Transcription steps logged (model loading, processing segments, timing, language detection)
+- [ ] File operations logged (transcript creation, appends, updates, saves)
+- [ ] AI operations logged (Ollama API calls, prompts sent, responses received, timing)
+- [ ] Error context logged (full stack traces, relevant state, recovery attempts)
+- [ ] Performance metrics logged (operation timings, memory usage for long operations)
+- [ ] Thread operations logged (thread creation, synchronization points, cleanup)
+- [ ] All DEBUG logs written to file even when console handler is suppressed
+
+**Technical Notes:**
+```python
+import logging
+import time
+from functools import wraps
+
+logger = logging.getLogger(__name__)
+
+# Configuration loading
+def load_config():
+    logger.debug("Loading configuration", extra={
+        "config_path": config_file_path,
+        "exists": config_file.exists()
+    })
+    config = parse_config(config_file)
+    logger.debug("Configuration loaded", extra={
+        "model": config.transcription.model,
+        "language": config.transcription.language,
+        "save_path": config.output.save_path
+    })
+    return config
+
+# Audio operations
+def record_audio(callback, device=None, samplerate=16000):
+    logger.debug("Starting audio capture", extra={
+        "device": device or "default",
+        "samplerate": samplerate,
+        "channels": 1
+    })
+    stream = sd.InputStream(...)
+    stream.start()
+    logger.debug("Audio stream started", extra={
+        "active": stream.active,
+        "latency": stream.latency
+    })
+    return stream
+
+# Transcription operations
+def transcribe_file(audio_path):
+    start_time = time.time()
+    logger.debug("Starting transcription", extra={
+        "audio_path": str(audio_path),
+        "model": self.model_size,
+        "language": self.language
+    })
+
+    logger.debug("Loading model", extra={"model_size": self.model_size})
+    model = load_model(self.model_size)
+    load_time = time.time() - start_time
+    logger.debug("Model loaded", extra={"load_time_seconds": load_time})
+
+    segments = []
+    for segment in model.transcribe(audio_path):
+        segments.append(segment)
+        logger.debug("Transcribed segment", extra={
+            "segment_index": len(segments),
+            "text_preview": segment["text"][:50],
+            "start": segment.get("start"),
+            "end": segment.get("end")
+        })
+
+    total_time = time.time() - start_time
+    logger.debug("Transcription complete", extra={
+        "total_segments": len(segments),
+        "total_time_seconds": total_time,
+        "audio_duration": get_audio_duration(audio_path)
+    })
+    return segments
+
+# File operations
+def create_transcript(save_dir):
+    transcript_id = get_next_id(save_dir)
+    filepath = save_dir / f"transcript_{date}_{transcript_id}.md"
+    logger.debug("Creating transcript file", extra={
+        "transcript_id": transcript_id,
+        "filepath": str(filepath),
+        "save_dir": str(save_dir)
+    })
+    write_file_atomic(filepath, frontmatter)
+    logger.debug("Transcript file created", extra={
+        "filepath": str(filepath),
+        "size_bytes": filepath.stat().st_size
+    })
+    return filepath, transcript_id
+
+# AI operations
+def generate_summary(transcript_text):
+    logger.debug("Generating AI summary", extra={
+        "transcript_length": len(transcript_text),
+        "model": self.model,
+        "ollama_url": self.base_url
+    })
+    start_time = time.time()
+    response = self.client.generate(prompt, model=self.model)
+    duration = time.time() - start_time
+    logger.debug("AI summary generated", extra={
+        "duration_seconds": duration,
+        "response_length": len(response),
+        "tokens_used": response.get("tokens", "unknown")
+    })
+    return response
+
+# Performance timing decorator
+def log_timing(operation_name):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start = time.time()
+            logger.debug(f"Starting {operation_name}")
+            try:
+                result = func(*args, **kwargs)
+                duration = time.time() - start
+                logger.debug(f"Completed {operation_name}", extra={
+                    "duration_seconds": duration
+                })
+                return result
+            except Exception as e:
+                duration = time.time() - start
+                logger.debug(f"Failed {operation_name}", extra={
+                    "duration_seconds": duration,
+                    "error": str(e)
+                }, exc_info=True)
+                raise
+        return wrapper
+    return decorator
+```
+
+**Key Areas to Add DEBUG Logging:**
+1. **Configuration System** (`rejoice/core/config.py`)
+   - Config file loading, parsing, validation
+   - Default values used
+   - Environment variable overrides
+
+2. **Audio System** (`rejoice/audio/__init__.py`)
+   - Device detection and selection
+   - Stream initialization and parameters
+   - Audio callback invocations (throttled - not every callback)
+   - Stream start/stop events
+
+3. **Recording Session** (`rejoice/cli/commands.py`)
+   - Session start/stop with timing
+   - Thread creation and lifecycle
+   - Display updates (throttled)
+   - User input detection
+
+4. **Transcription** (`rejoice/transcription/__init__.py`)
+   - Model loading and caching
+   - Audio file processing
+   - Segment generation
+   - Language detection results
+   - VAD filtering decisions
+
+5. **Transcript Manager** (`rejoice/transcript/manager.py`)
+   - File creation, updates, appends
+   - Frontmatter parsing and updates
+   - ID generation and normalization
+
+6. **AI Client** (`rejoice/ai/client.py`)
+   - API connection attempts
+   - Request/response logging (sanitized - no full prompts/responses in logs)
+   - Model selection
+   - Error handling and retries
+
+7. **Error Handling** (throughout)
+   - Full exception context
+   - Relevant state at error time
+   - Recovery attempts
+
+**Logging Best Practices:**
+- Use structured logging with `extra={}` for key-value data
+- Include timing information for operations >100ms
+- Throttle high-frequency logs (e.g., audio callbacks - log every N seconds)
+- Sanitize sensitive data (API keys, full prompts/responses)
+- Use appropriate log levels (DEBUG for development, INFO for user-facing events)
+- Include context (file paths, IDs, operation names)
+
+**Test Requirements:**
+- Test debug logs appear in file when `--debug` is used
+- Test debug logs appear in console when `--debug` is used (when not suppressed)
+- Test logs are useful for troubleshooting common issues
+- Test logs don't contain sensitive information
+- Test log file size is reasonable (throttling works)
+- Test timing information is accurate
+- Test structured data in logs is parseable
+- Verify logs help diagnose issues from user reports
 
 ---
 
@@ -4244,14 +4453,14 @@ As the project team, we want to announce Rejoice so that users can discover it.
 
 ### By Priority
 - **Critical:** 28 stories
-- **High:** 25 stories
+- **High:** 26 stories
 - **Medium:** 28 stories
 - **Low:** 10 stories
 
 ### By Estimate
 - **XS (<2h):** 0 stories
 - **S (2-4h):** 28 stories
-- **M (4-8h):** 41 stories
+- **M (4-8h):** 42 stories
 - **L (1-2d):** 16 stories
 - **XL (2-5d):** 6 stories
 
@@ -4262,7 +4471,7 @@ As the project team, we want to announce Rejoice so that users can discover it.
 - **Phase 4 (Advanced):** 5 stories
 - **Phase 5 (AI):** 10 stories
 - **Phase 6 (Commands):** 10 stories
-- **Phase 7 (Settings):** 10 stories
+- **Phase 7 (Settings):** 11 stories
 - **Phase 8 (Installation):** 9 stories
 - **Phase 9 (Polish):** 11 stories
 

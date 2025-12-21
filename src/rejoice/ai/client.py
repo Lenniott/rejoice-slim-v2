@@ -20,12 +20,14 @@ class OllamaClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def generate(self, prompt: str, model: str = "llama2", stream: bool = False) -> str:
+    def generate(
+        self, prompt: str, model: str = "qwen3:4b", stream: bool = False
+    ) -> str:
         """Generate text using Ollama.
 
         Args:
             prompt: The prompt to send to the model
-            model: Model name to use (default: llama2)
+            model: Model name to use (default: qwen3:4b)
             stream: Whether to stream the response (default: False)
 
         Returns:
@@ -75,14 +77,14 @@ class OllamaClient:
         except Exception as e:
             raise AIError(f"Unexpected error calling Ollama: {str(e)}") from e
 
-    def generate_streaming(self, prompt: str, model: str = "llama2") -> Iterator[str]:
+    def generate_streaming(self, prompt: str, model: str = "qwen3:4b") -> Iterator[str]:
         """Generate text with streaming response.
 
         Yields text chunks as they are generated.
 
         Args:
             prompt: The prompt to send to the model
-            model: Model name to use (default: llama2)
+            model: Model name to use (default: qwen3:4b)
 
         Yields:
             Text chunks as strings

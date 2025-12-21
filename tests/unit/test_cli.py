@@ -1040,6 +1040,10 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
             yield {"text": "Hello world", "start": 0.0, "end": 1.0}
 
     monkeypatch.setattr(
+        "rejoice.cli.commands.load_config",
+        lambda: FakeConfig(),
+    )
+    monkeypatch.setattr(
         "rejoice.cli.commands.create_transcript",
         fake_create_transcript,
     )

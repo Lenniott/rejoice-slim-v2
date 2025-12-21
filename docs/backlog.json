@@ -254,7 +254,7 @@
           "text": "`rec config` commands work"
         }
       ],
-      "technicalNotes": "```yaml\n# config.yaml structure\ntranscription:\n  model: medium\n  language: auto\n  vad_filter: true\n\noutput:\n  save_path: ~/Documents/transcripts\n  template: default\n  auto_analyze: true\n  auto_copy: true\n\naudio:\n  device: default\n  sample_rate: 16000\n\nai:\n  ollama_url: http://localhost:11434\n  model: llama2\n  prompts_path: ~/.config/rejoice/prompts/\n```",
+      "technicalNotes": "```yaml\n# config.yaml structure\ntranscription:\n  model: medium\n  language: auto\n  vad_filter: true\n\noutput:\n  save_path: ~/Documents/transcripts\n  template: default\n  auto_analyze: true\n  auto_copy: true\n\naudio:\n  device: default\n  sample_rate: 16000\n\nai:\n  ollama_url: http://localhost:11434\n  model: qwen3:4b\n  prompts_path: ~/.config/rejoice/prompts/\n```",
       "testRequirements": "- Unit tests for config loading\n- Test default config\n- Test config validation\n- Test config merging (defaults + user overrides)"
     },
     {
@@ -1169,7 +1169,7 @@
           "text": "Streaming response support"
         }
       ],
-      "technicalNotes": "```python\nimport requests\n\nclass OllamaClient:\n    def __init__(self, base_url='http://localhost:11434'):\n        self.base_url = base_url\n\n    def generate(self, prompt, model='llama2'):\n        response = requests.post(\n            f'{self.base_url}/api/generate',\n            json={'model': model, 'prompt': prompt}\n        )\n        return response.json()\n```",
+      "technicalNotes": "```python\nimport requests\n\nclass OllamaClient:\n    def __init__(self, base_url='http://localhost:11434'):\n        self.base_url = base_url\n\n    def generate(self, prompt, model='qwen3:4b'):\n        response = requests.post(\n            f'{self.base_url}/api/generate',\n            json={'model': model, 'prompt': prompt}\n        )\n        return response.json()\n```",
       "testRequirements": "- Test connection\n- Test with/without Ollama running\n- Test different models\n- Test streaming"
     },
     {
@@ -1916,7 +1916,7 @@
           "text": "Set Ollama URL (default: localhost:11434)"
         },
         {
-          "text": "Set default model (llama2, mistral, etc.)"
+          "text": "Set default model (qwen3:4b, mistral, etc.)"
         },
         {
           "text": "Test connection"

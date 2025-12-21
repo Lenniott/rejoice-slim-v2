@@ -173,6 +173,20 @@ def start_recording_session(
     input_thread = threading.Thread(target=_wait_for_enter_input, daemon=True)
     input_thread.start()
 
+    # Suppress console logging handler before starting display thread
+    # This prevents debug logs from interfering with Rich Live's alternate screen
+    import logging
+
+    root_logger = logging.getLogger()
+    console_handler = None
+    for handler in root_logger.handlers:
+        # Find the RichHandler (console handler)
+        if hasattr(handler, "rich_tracebacks"):
+            console_handler = handler
+            # Temporarily remove the handler to prevent debug logs from interfering
+            root_logger.removeHandler(handler)
+            break
+
     # Display thread for Rich Live panel
     def _display_recording_status():
         """Display live recording status with elapsed time and audio level."""
@@ -206,8 +220,9 @@ def start_recording_session(
                     live.update(panel)
                     time.sleep(0.1)  # Update 10 times per second for smooth display
         finally:
-            # Ensure Live context exits cleanly
-            pass
+            # Restore console handler after Live display exits
+            if console_handler:
+                root_logger.addHandler(console_handler)
 
     display_thread = threading.Thread(target=_display_recording_status, daemon=True)
     display_thread.start()
@@ -235,6 +250,10 @@ def start_recording_session(
         # 4. Stop recording immediately
         recording_active.clear()
         enter_pressed.set()  # Signal display thread to stop
+
+        # Restore console handler if it was suppressed
+        if console_handler:
+            root_logger.addHandler(console_handler)
 
         # CRITICAL: Close audio stream and WAV file FIRST
         # This ensures the file is properly flushed and closed before transcription
