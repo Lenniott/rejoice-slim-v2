@@ -1346,6 +1346,9 @@ def test_temp_file_cleanup_on_success(monkeypatch, tmp_path):
     import tempfile
     import wave
 
+    # Save reference to original before monkeypatching
+    original_named_temporary_file = tempfile.NamedTemporaryFile
+
     def fake_named_temporary_file(*args, **kwargs):
         # Check if this is for the audio file (has .wav suffix and delete=False)
         # or for atomic writes (has mode='w' and encoding)
@@ -1370,10 +1373,8 @@ def test_temp_file_cleanup_on_success(monkeypatch, tmp_path):
 
             return FakeTempFile()
         else:
-            # This is for atomic file writes - use real tempfile
-            import tempfile as tf
-
-            return tf.NamedTemporaryFile(*args, **kwargs)
+            # This is for atomic file writes - use original tempfile
+            return original_named_temporary_file(*args, **kwargs)
 
     class FakeWaveFile:
         def __init__(self, *args, **kwargs):
@@ -1477,6 +1478,9 @@ def test_transcription_error_handled_gracefully(monkeypatch, tmp_path):
     import tempfile
     import wave
 
+    # Save reference to original before monkeypatching
+    original_named_temporary_file = tempfile.NamedTemporaryFile
+
     def fake_named_temporary_file(*args, **kwargs):
         # Check if this is for the audio file (has .wav suffix and delete=False)
         # or for atomic writes (has mode='w' and encoding)
@@ -1501,10 +1505,8 @@ def test_transcription_error_handled_gracefully(monkeypatch, tmp_path):
 
             return FakeTempFile()
         else:
-            # This is for atomic file writes - use real tempfile
-            import tempfile as tf
-
-            return tf.NamedTemporaryFile(*args, **kwargs)
+            # This is for atomic file writes - use original tempfile
+            return original_named_temporary_file(*args, **kwargs)
 
     class FakeWaveFile:
         def __init__(self, *args, **kwargs):
@@ -1753,6 +1755,9 @@ def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
     import tempfile
     import wave
 
+    # Save reference to original before monkeypatching
+    original_named_temporary_file = tempfile.NamedTemporaryFile
+
     def fake_named_temporary_file(*args, **kwargs):
         # Check if this is for the audio file (has .wav suffix and delete=False)
         # or for atomic writes (has mode='w' and encoding)
@@ -1777,10 +1782,8 @@ def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
 
             return FakeTempFile()
         else:
-            # This is for atomic file writes - use real tempfile
-            import tempfile as tf
-
-            return tf.NamedTemporaryFile(*args, **kwargs)
+            # This is for atomic file writes - use original tempfile
+            return original_named_temporary_file(*args, **kwargs)
 
     class FakeWaveFile:
         def __init__(self, *args, **kwargs):

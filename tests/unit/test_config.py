@@ -249,3 +249,70 @@ def test_load_env_overrides_converts_integer_strings(monkeypatch):
             with patch.dict(os.environ, {"REJOICE_AUDIO_SAMPLE_RATE": "32000"}):
                 overrides = load_env_overrides()
                 assert overrides["audio"]["sample_rate"] == 32000
+
+
+# Tests for R-013: Audio File Archiving
+def test_audio_config_defaults():
+    """GIVEN default config
+    WHEN AudioConfig is created
+    THEN keep_after_transcription defaults to True
+    AND auto_delete defaults to False"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".config" / "rejoice"
+        config_dir.mkdir(parents=True)
+
+        with patch("rejoice.core.config.get_config_dir", return_value=config_dir):
+            config = load_config()
+
+            assert config.audio.keep_after_transcription is True
+            assert config.audio.auto_delete is False
+
+
+def test_audio_config_env_override():
+    """GIVEN environment variables for audio config
+    WHEN config is loaded
+    THEN env vars override defaults"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".config" / "rejoice"
+        config_dir.mkdir(parents=True)
+
+        with patch("rejoice.core.config.get_config_dir", return_value=config_dir):
+            with patch.dict(
+                os.environ,
+                {
+                    "REJOICE_AUDIO_KEEP_AFTER_TRANSCRIPTION": "false",
+                    "REJOICE_AUDIO_AUTO_DELETE": "true",
+                },
+            ):
+                config = load_config()
+
+                assert config.audio.keep_after_transcription is False
+                assert config.audio.auto_delete is True
+
+
+def test_audio_config_user_config_override():
+    """GIVEN user config file with audio settings
+    WHEN config is loaded
+    THEN user config overrides defaults"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir) / ".config" / "rejoice"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.yaml"
+
+        user_config = {
+            "audio": {
+                "keep_after_transcription": False,
+                "auto_delete": True,
+            }
+        }
+
+        config_file.write_text(yaml.dump(user_config))
+
+        with patch("rejoice.core.config.get_config_dir", return_value=config_dir):
+            config = load_config()
+
+            assert config.audio.keep_after_transcription is False
+            assert config.audio.auto_delete is True
+            # Other audio fields still have defaults
+            assert config.audio.sample_rate == 16000
+            assert config.audio.device == "default"

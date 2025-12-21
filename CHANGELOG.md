@@ -22,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [R-013] Audio File Archiving for Lossless Information
+  - Audio files are now permanently saved in `audio/` subdirectory alongside transcripts
+  - Audio files preserved even if transcription fails
+  - Configurable deletion behavior via `audio.keep_after_transcription` and `audio.auto_delete`
+  - Audio file path stored in transcript frontmatter for reference
+  - Created `src/rejoice/audio/archive.py` with archiving utilities (`archive_audio_file`, `ensure_audio_directory_exists`, `get_archived_audio_path`)
+  - Added `update_audio_file()` function to transcript manager for frontmatter updates
+  - Audio files archived immediately when recording stops (before transcription)
+  - Deletion prompt after successful transcription (conditional on config)
+  - Automatic `audio/` directory creation
+  - Handles existing audio file collisions with timestamp suffix
+  - Tests: 12 unit tests for archiving utilities, 5 unit tests for frontmatter updates, 3 unit tests for config, 6 integration tests, 1 E2E test (all passing)
+  - Coverage: 95%+ for new audio archive module
+
 - [AI-001] Ollama Client Integration
   - Implemented `OllamaClient` class in `src/rejoice/ai/client.py` for REST API integration with Ollama
   - Supports text generation with configurable model selection

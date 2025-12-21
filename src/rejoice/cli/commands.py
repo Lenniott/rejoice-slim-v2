@@ -26,12 +26,14 @@ from rejoice.core.config import load_config
 from rejoice.core.logging import setup_logging
 from rejoice.exceptions import TranscriptError
 from rejoice.transcription import Transcriber
+from rejoice.audio.archive import archive_audio_file
 from rejoice.transcript.manager import (
     append_to_transcript,
     create_transcript,
     migrate_filenames,
     normalize_id,
     parse_transcript_filename,
+    update_audio_file,
     update_language,
     update_status,
 )
@@ -309,8 +311,29 @@ def start_recording_session(
         except Exception:  # pragma: no cover - defensive cleanup
             pass
     else:
-        # 5. Run single transcription pass with progress bar
+        # 5. Archive audio file before transcription (R-013)
+        # Only archive if temp file exists (it may not exist in test scenarios
+        # or if recording was very short)
+        archived_audio_path = None
+        if temp_audio_path.exists():
+            # Move temp audio file to permanent archive location
+            archived_audio_path = archive_audio_file(temp_audio_path, filepath)
+
+            # Update frontmatter with relative path to archived audio file
+            relative_audio_path = archived_audio_path.relative_to(filepath.parent)
+            update_audio_file(filepath, str(relative_audio_path))
+
+            console.print(f"💾 Audio archived: {relative_audio_path}")
+        else:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                f"Temp audio file {temp_audio_path} doesn't exist, skipping archiving"
+            )
+
+        # 6. Run single transcription pass with progress bar
         console.print("\n🔄 Transcribing...")
+        transcription_successful = False
         try:
             # Suppress verbose INFO logs from WhisperX (which uses faster-whisper),
             # huggingface, httpx. These libraries log model downloads/checks which
@@ -355,7 +378,14 @@ def start_recording_session(
                     console=console,
                 ) as progress:
                     progress.add_task("Transcribing", total=None)
-                    for segment in transcriber.transcribe_file(str(temp_audio_path)):
+                    # Use archived audio path if available, otherwise fall back
+                    # to temp (for test scenarios)
+                    audio_file_path = (
+                        str(archived_audio_path)
+                        if archived_audio_path
+                        else str(temp_audio_path)
+                    )
+                    for segment in transcriber.transcribe_file(audio_file_path):
                         text = str(segment.get("text", "")).strip()
                         if text:
                             segments.append(text)
@@ -368,6 +398,8 @@ def start_recording_session(
                 # Update language in frontmatter if detected
                 if transcriber.last_language:
                     update_language(filepath, transcriber.last_language)
+
+                transcription_successful = True
             finally:
                 # Restore console handler level
                 if console_handler and original_console_level is not None:
@@ -379,16 +411,57 @@ def start_recording_session(
 
         except Exception as e:  # pragma: no cover - defensive error handling
             console.print(f"[yellow]Warning: Transcription failed: {e}[/yellow]")
+            # Audio file is preserved on transcription failure (R-013 requirement)
+            if archived_audio_path:
+                console.print(
+                    f"⚠️  Transcription failed. Audio file kept for recovery: "
+                    f"{archived_audio_path.name}"
+                )
+            else:
+                console.print("⚠️  Transcription failed. No audio file was recorded.")
         finally:
-            # Always clean up temp audio file
-            try:
-                temp_audio_path.unlink(missing_ok=True)
-            except Exception:  # pragma: no cover - defensive cleanup
-                pass
+            # Note: Temp audio file has been archived, so no cleanup needed here
+            # The archived audio file will be handled by deletion prompt logic
+            pass
 
-        # 6. Finalise the transcript frontmatter to reflect a completed recording.
+        # 7. Finalise the transcript frontmatter to reflect a completed recording.
         update_status(filepath, "completed")
         console.print(f"✅ Transcript saved: {filepath}")
+
+        # 8. Handle audio file deletion prompt (R-013)
+        # Only prompt if transcription succeeded and audio file was archived
+        if transcription_successful and archived_audio_path:
+            # Check if we should skip prompt
+            skip_prompt = (
+                config.audio.auto_delete or not config.audio.keep_after_transcription
+            )
+
+            relative_audio_path = archived_audio_path.relative_to(filepath.parent)
+
+            if skip_prompt:
+                # Keep file silently (no prompt)
+                console.print(f"💾 Audio file kept: {relative_audio_path}")
+            else:
+                # Prompt user for deletion (default: n = keep)
+                should_delete = Confirm.ask(
+                    f"Delete audio file to save space?\n  {relative_audio_path}",
+                    default=False,
+                )
+
+                if should_delete:
+                    try:
+                        archived_audio_path.unlink(missing_ok=True)
+                        console.print(f"🗑️  Audio file deleted: {relative_audio_path}")
+                    except (
+                        Exception
+                    ) as e:  # pragma: no cover - defensive error handling
+                        console.print(
+                            f"[yellow]Warning: Could not delete audio file: "
+                            f"{e}[/yellow]"
+                        )
+                else:
+                    console.print(f"💾 Audio file kept: {relative_audio_path}")
+        # If transcription failed, audio is already preserved (message shown above)
 
     return filepath, transcript_id
 
@@ -476,7 +549,7 @@ def _split_frontmatter(content: str) -> tuple[str, str]:
         raise TranscriptError(
             "Transcript frontmatter is malformed.",
             suggestion=(
-                "Check the transcript file for manual edits to the '---' markers."
+                "Check the transcript file for manual edits to the " "'---' markers."
             ),
         ) from exc
 

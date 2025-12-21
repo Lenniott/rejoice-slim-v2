@@ -405,6 +405,73 @@ def update_language(filepath: Path, language: str) -> None:
     write_file_atomic(filepath, new_content)
 
 
+def update_audio_file(filepath: Path, audio_file_path: str) -> None:
+    """Update the ``audio_file`` field in a transcript's YAML frontmatter.
+
+    This mirrors :func:`update_status` and :func:`update_language` but targets
+    the ``audio_file`` key instead. The operation is performed atomically via
+    :func:`write_file_atomic` and preserves all other frontmatter fields and
+    the body content.
+
+    Args:
+        filepath: Path to the transcript markdown file.
+        audio_file_path: Relative path to the audio file (e.g.,
+            ``"audio/transcript_20251220_000054.wav"``).
+
+    Raises:
+        TranscriptError: If the transcript does not contain valid YAML
+        frontmatter.
+    """
+    raw = filepath.read_text(encoding="utf-8")
+
+    if not raw.startswith("---"):
+        raise TranscriptError(
+            "Transcript file is missing YAML frontmatter.",
+            suggestion="Ensure transcripts are created via the transcript manager.",
+        )
+
+    try:
+        first_sep_end = raw.index("\n", 3)
+        second_sep_start = raw.index("\n---", first_sep_end)
+    except ValueError as exc:  # pragma: no cover - defensive; tested via error paths
+        raise TranscriptError(
+            "Transcript frontmatter is malformed.",
+            suggestion=(
+                "Check the transcript file for manual edits " "to the '---' markers."
+            ),
+        ) from exc
+
+    frontmatter_block = raw[first_sep_end + 1 : second_sep_start]
+    body = raw[second_sep_start + len("\n---\n") :]
+
+    try:
+        data = yaml.safe_load(frontmatter_block) or {}
+    except yaml.YAMLError as exc:  # pragma: no cover - defensive
+        raise TranscriptError(
+            "Transcript frontmatter contains invalid YAML.",
+            suggestion="Recreate the transcript or fix the frontmatter formatting.",
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise TranscriptError(
+            "Transcript frontmatter must be a mapping.",
+            suggestion="Ensure the YAML frontmatter is a key/value mapping.",
+        )
+
+    data["audio_file"] = audio_file_path
+
+    yaml_block = yaml.safe_dump(
+        data,
+        default_flow_style=False,
+        sort_keys=False,
+    ).rstrip("\n")
+
+    new_frontmatter = f"---\n{yaml_block}\n---\n\n"
+    new_content = new_frontmatter + body.lstrip("\n")
+
+    write_file_atomic(filepath, new_content)
+
+
 def find_old_format_files(save_dir: Path) -> list[Path]:
     """Find all files matching old format pattern.
 

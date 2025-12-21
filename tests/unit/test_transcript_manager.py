@@ -526,6 +526,106 @@ def test_update_language_handles_invalid_yaml():
             manager.update_language(filepath, "en")
 
 
+# Tests for R-013: Audio File Archiving
+def test_update_audio_file_updates_frontmatter_only(tmp_path: Path):
+    """GIVEN an existing transcript
+    WHEN update_audio_file is called
+    THEN the audio_file field in the YAML frontmatter is updated
+    AND the body content is preserved.
+    """
+    save_dir = tmp_path
+    filepath, tid = manager.create_transcript(save_dir)
+
+    # Append some body content so we can verify it is preserved
+    manager.append_to_transcript(filepath, "Body content line 1.")
+    manager.append_to_transcript(filepath, "Body content line 2.")
+
+    original_content = read_file(filepath)
+    assert f"id: '{tid}'" in original_content
+    assert "audio_file" not in original_content
+    assert "Body content line 1." in original_content
+    assert "Body content line 2." in original_content
+
+    # WHEN: we update audio_file to a relative path
+    manager.update_audio_file(filepath, "audio/transcript_20251220_000054.wav")
+
+    updated_content = read_file(filepath)
+
+    # THEN: audio_file is updated, id and body are unchanged
+    assert f"id: '{tid}'" in updated_content
+    assert "audio_file: audio/transcript_20251220_000054.wav" in updated_content
+    assert "Body content line 1." in updated_content
+    assert "Body content line 2." in updated_content
+
+
+def test_update_audio_file_is_atomic(tmp_path: Path, monkeypatch):
+    """GIVEN an existing transcript
+    WHEN update_audio_file is called
+    THEN the file is rewritten atomically via write_file_atomic.
+    """
+    save_dir = tmp_path
+    filepath, _tid = manager.create_transcript(save_dir)
+
+    calls = {"used": False}
+
+    def fake_write_file_atomic(target, content):
+        calls["used"] = True
+
+    monkeypatch.setattr(manager, "write_file_atomic", fake_write_file_atomic)
+
+    manager.update_audio_file(filepath, "audio/test.wav")
+
+    assert calls["used"] is True
+
+
+def test_update_audio_file_handles_missing_frontmatter():
+    """GIVEN update_audio_file
+    WHEN file doesn't start with ---
+    THEN TranscriptError is raised"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = Path(tmpdir) / "transcript.md"
+        filepath.write_text("No frontmatter here")
+
+        with pytest.raises(manager.TranscriptError, match="missing YAML frontmatter"):
+            manager.update_audio_file(filepath, "audio/test.wav")
+
+
+def test_update_audio_file_handles_invalid_yaml():
+    """GIVEN update_audio_file
+    WHEN frontmatter has invalid YAML
+    THEN TranscriptError is raised"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        filepath = Path(tmpdir) / "transcript.md"
+        # Invalid YAML in frontmatter
+        content = "---\nid: '000001'\ninvalid: [unclosed\n---\nbody"
+        filepath.write_text(content)
+
+        with pytest.raises(manager.TranscriptError, match="invalid YAML"):
+            manager.update_audio_file(filepath, "audio/test.wav")
+
+
+def test_update_audio_file_overwrites_existing_audio_file_field(tmp_path: Path):
+    """GIVEN a transcript with an existing audio_file field
+    WHEN update_audio_file is called with a new path
+    THEN the audio_file field is updated to the new path
+    """
+    save_dir = tmp_path
+    filepath, tid = manager.create_transcript(save_dir)
+
+    # Set initial audio_file
+    manager.update_audio_file(filepath, "audio/old_audio.wav")
+    original_content = read_file(filepath)
+    assert "audio_file: audio/old_audio.wav" in original_content
+
+    # Update to new path
+    manager.update_audio_file(filepath, "audio/new_audio.wav")
+    updated_content = read_file(filepath)
+
+    assert "audio_file: audio/new_audio.wav" in updated_content
+    assert "audio_file: audio/old_audio.wav" not in updated_content
+    assert f"id: '{tid}'" in updated_content
+
+
 # Tests for R-011: Filename Order Normalisation
 
 

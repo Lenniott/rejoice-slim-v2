@@ -42,7 +42,7 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 - Installation & setup:
   - ✅ [I-007], ❌ [I-008]
 - Recording polish:
-  - ❌ [R-010], ❌ [R-011], ❌  [R-013]
+  - ❌ [R-010], ❌ [R-011], ✅  [R-013]
 - Transcription usability:
   - ❌ [T-004], ❌ [T-006]
 - Advanced transcription features:
@@ -1114,23 +1114,23 @@ def record_and_transcribe():
 ### [R-013] Audio File Archiving for Lossless Information
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-012, T-009]
 
 **User Story:**
 As a user, I want my audio files permanently saved alongside transcripts so that I never lose my recordings even if transcription fails or I need to re-process the audio later. This ensures lossless information preservation - if I record for an hour, I don't want to lose that hour of content.
 
 **Acceptance Criteria:**
-- [ ] Audio files saved in `audio/` subdirectory within transcript save directory
-- [ ] Audio file name matches transcript filename (e.g., `transcript_20251220_000054.md` → `transcript_20251220_000054.wav`)
-- [ ] Audio file saved immediately when recording stops (before transcription)
-- [ ] Audio file preserved even if transcription fails
-- [ ] After successful transcription, prompt user: "Would you like to delete the audio file? (y/n)" (default: n)
-- [ ] Config option: `audio.keep_after_transcription` (default: true)
-- [ ] Config option: `audio.auto_delete` (default: false) - if true, skip prompt and keep
-- [ ] Audio file path stored in transcript frontmatter for reference
-- [ ] Handle existing audio files gracefully (don't overwrite without confirmation)
-- [ ] Create `audio/` directory automatically if it doesn't exist
+- [x] Audio files saved in `audio/` subdirectory within transcript save directory
+- [x] Audio file name matches transcript filename (e.g., `000054_transcript_20251220.md` → `000054_transcript_20251220.wav`)
+- [x] Audio file saved immediately when recording stops (before transcription)
+- [x] Audio file preserved even if transcription fails
+- [x] After successful transcription, prompt user: "Would you like to delete the audio file? (y/n)" (default: n)
+- [x] Config option: `audio.keep_after_transcription` (default: true)
+- [x] Config option: `audio.auto_delete` (default: false) - if true, skip prompt and keep
+- [x] Audio file path stored in transcript frontmatter for reference
+- [x] Handle existing audio files gracefully (don't overwrite without confirmation)
+- [x] Create `audio/` directory automatically if it doesn't exist
 
 **Technical Notes:**
 ```python

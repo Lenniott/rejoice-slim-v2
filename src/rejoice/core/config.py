@@ -35,6 +35,12 @@ class AudioConfig:
 
     device: str = "default"
     sample_rate: int = 16000
+    keep_after_transcription: bool = (
+        True  # Keep audio files after transcription (default: keep)
+    )
+    auto_delete: bool = (
+        False  # If True, skip prompt and keep file (if False, prompt user)
+    )
 
 
 @dataclass
@@ -102,6 +108,8 @@ def get_default_config() -> Dict[str, Any]:
         "audio": {
             "device": "default",
             "sample_rate": 16000,
+            "keep_after_transcription": True,
+            "auto_delete": False,
         },
         "ai": {
             "ollama_url": "http://localhost:11434",
@@ -145,6 +153,8 @@ def load_env_overrides() -> Dict[str, Any]:
         "REJOICE_OUTPUT_AUTO_COPY": ("output", "auto_copy"),
         "REJOICE_AUDIO_DEVICE": ("audio", "device"),
         "REJOICE_AUDIO_SAMPLE_RATE": ("audio", "sample_rate"),
+        "REJOICE_AUDIO_KEEP_AFTER_TRANSCRIPTION": ("audio", "keep_after_transcription"),
+        "REJOICE_AUDIO_AUTO_DELETE": ("audio", "auto_delete"),
         "REJOICE_AI_OLLAMA_URL": ("ai", "ollama_url"),
         "REJOICE_AI_MODEL": ("ai", "model"),
         "REJOICE_AI_PROMPTS_PATH": ("ai", "prompts_path"),
