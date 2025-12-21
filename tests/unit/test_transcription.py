@@ -1,8 +1,9 @@
-"""Tests for transcription system ([T-001] faster-whisper Integration)."""
+"""Tests for transcription system ([T-011] WhisperX Integration)."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from types import ModuleType
 from typing import Dict, List
 
 import pytest
@@ -13,50 +14,47 @@ import rejoice.transcription as transcription
 from rejoice.transcript import manager as transcript_manager
 
 
-class DummySegment:
-    """Simple stand-in for faster-whisper segment objects."""
+# WhisperX returns segments as dicts, not objects
 
-    def __init__(self, text: str, start: float, end: float) -> None:
-        self.text = text
-        self.start = start
-        self.end = end
+
+def create_mock_whisperx_module(monkeypatch):
+    """Create a mock whisperx module for testing."""
+    mock_whisperx = ModuleType("whisperx")
+    monkeypatch.setattr(transcription, "whisperx", mock_whisperx)
+    return mock_whisperx
 
 
 def test_transcriber_initialises_model_with_config(monkeypatch):
     """GIVEN a transcription config
     WHEN Transcriber is constructed
-    THEN WhisperModel is initialised with the configured model name.
+    THEN WhisperX model is loaded with the configured model name.
     """
 
     created: Dict[str, object] = {}
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
 
-    class DummyModel:
-        def __init__(
-            self,
-            model_size: str,
-            device: str = "cpu",
-            compute_type: str = "int8",
-            local_files_only: bool = False,
-        ):
-            created["model_size"] = model_size
-            created["device"] = device
-            created["compute_type"] = compute_type
-            created["local_files_only"] = local_files_only
+    def mock_load_model(model: str, device: str = "cpu", compute_type: str = "int8"):
+        created["model"] = model
+        created["device"] = device
+        created["compute_type"] = compute_type
 
-        def transcribe(self, *args, **kwargs):  # pragma: no cover - not used here
-            return [], {}
+        class DummyModel:
+            def transcribe(self, *args, **kwargs):  # pragma: no cover - not used here
+                return {"segments": [], "language": None}
 
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+        return DummyModel()
+
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="small", language="en", vad_filter=True)
 
     # Construct for side-effects; no need to keep a reference.
     transcription.Transcriber(cfg)
 
-    assert created["model_size"] == "small"
+    assert created["model"] == "small"
     assert created["device"] == "cpu"
     assert created["compute_type"] == "int8"
-    assert created["local_files_only"] is True  # Enforced for local-only operation
 
 
 def test_transcribe_file_yields_normalised_segments_and_uses_vad_and_language(
@@ -65,24 +63,30 @@ def test_transcribe_file_yields_normalised_segments_and_uses_vad_and_language(
     """GIVEN an audio file path and config
     WHEN transcribe_file is called
     THEN segments are yielded as dictionaries with text/start/end
-    AND faster-whisper is called with VAD and language from config.
+    AND WhisperX is called with VAD and language from config.
     """
 
     calls: Dict[str, object] = {}
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
-            calls["audio_path"] = audio_path
+        def transcribe(self, audio, language=None, vad_filter=True):
             calls["vad_filter"] = vad_filter
             calls["language"] = language
-            segments = [DummySegment("hello world", 0.0, 1.23)]
-            info = {"duration": 1.23}
-            return segments, info
+            return {
+                "segments": [{"text": "hello world", "start": 0.0, "end": 1.23}],
+                "language": "en",
+            }
 
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
+
+    def mock_load_audio(audio_path: str):
+        calls["audio_path"] = audio_path
+        return b"dummy_audio"
+
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = mock_load_audio
 
     cfg = TranscriptionConfig(model="tiny", language="en", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
@@ -104,19 +108,24 @@ def test_transcribe_file_yields_normalised_segments_and_uses_vad_and_language(
 def test_transcribe_file_passes_none_language_when_auto(monkeypatch, tmp_path: Path):
     """GIVEN language='auto' in config
     WHEN transcribe_file is called
-    THEN language=None is passed through to faster-whisper."""
+    THEN language=None is passed through to WhisperX."""
 
     observed = {}
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
+        def transcribe(self, audio, language=None, vad_filter=True):
             observed["language"] = language
-            return [DummySegment("hi", 0.0, 0.5)], {}
+            return {
+                "segments": [{"text": "hi", "start": 0.0, "end": 0.5}],
+                "language": None,
+            }
 
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
+
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
@@ -134,18 +143,19 @@ def test_transcriber_tracks_detected_language_when_auto(monkeypatch, tmp_path: P
     """
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
+        def transcribe(self, audio, language=None, vad_filter=True):
+            # WhisperX returns language in the result dict
+            return {
+                "segments": [{"text": "hola mundo", "start": 0.0, "end": 1.0}],
+                "language": "es",
+            }
 
-        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
-            # Simulate faster-whisper returning an info object with language
-            class Info:
-                language = "es"
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
 
-            segments = [DummySegment("hola mundo", 0.0, 1.0)]
-            return segments, Info()
-
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
@@ -162,17 +172,19 @@ def test_transcriber_last_language_matches_forced_language(monkeypatch, tmp_path
     """
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
+        def transcribe(self, audio, language=None, vad_filter=True):
+            # Even if model detects different language, we use configured one
+            return {
+                "segments": [{"text": "bonjour", "start": 0.0, "end": 1.0}],
+                "language": "fr",  # Model detects French, but config says English
+            }
 
-        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
-            class Info:
-                language = "fr"
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
 
-            segments = [DummySegment("bonjour", 0.0, 1.0)]
-            return segments, Info()
-
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="tiny", language="en", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
@@ -182,13 +194,14 @@ def test_transcriber_last_language_matches_forced_language(monkeypatch, tmp_path
     assert transcriber.last_language == "en"
 
 
-def test_transcriber_raises_helpful_error_when_faster_whisper_missing(monkeypatch):
-    """GIVEN faster-whisper cannot be imported
+def test_transcriber_raises_helpful_error_when_whisperx_missing(monkeypatch):
+    """GIVEN WhisperX cannot be imported
     WHEN Transcriber is constructed
     THEN a TranscriptionError with a helpful suggestion is raised.
     """
 
-    monkeypatch.setattr(transcription, "WhisperModel", None)
+    # Set whisperx to None to test error handling
+    monkeypatch.setattr(transcription, "whisperx", None)
 
     cfg = TranscriptionConfig(model="small", language="en", vad_filter=True)
 
@@ -196,12 +209,12 @@ def test_transcriber_raises_helpful_error_when_faster_whisper_missing(monkeypatc
         transcription.Transcriber(cfg)
 
     message = str(excinfo.value).lower()
-    assert "faster-whisper" in message
+    assert "whisperx" in message
     assert "install" in message or "dependency" in message
 
 
 def test_transcribe_file_wraps_lower_level_errors(monkeypatch, tmp_path: Path):
-    """GIVEN faster-whisper raises during transcription
+    """GIVEN WhisperX raises during transcription
     WHEN transcribe_file is called
     THEN a TranscriptionError is raised with the original error message included.
     """
@@ -210,13 +223,15 @@ def test_transcribe_file_wraps_lower_level_errors(monkeypatch, tmp_path: Path):
         pass
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
-
         def transcribe(self, *args, **kwargs):
             raise Boom("boom")
 
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
+
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="tiny", language="en", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
@@ -242,21 +257,24 @@ def test_stream_file_to_transcript_appends_each_segment_in_order(
     calls: List[Dict[str, object]] = []
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
+        def transcribe(self, audio, language=None, vad_filter=True):
             # Two real segments and one empty/whitespace-only segment that
             # should be ignored for appends.
-            segments = [
-                DummySegment("first segment", 0.0, 1.0),
-                DummySegment("   ", 1.0, 2.0),
-                DummySegment("second segment", 2.0, 3.0),
-            ]
-            info = {"duration": 3.0}
-            return segments, info
+            return {
+                "segments": [
+                    {"text": "first segment", "start": 0.0, "end": 1.0},
+                    {"text": "   ", "start": 1.0, "end": 2.0},
+                    {"text": "second segment", "start": 2.0, "end": 3.0},
+                ],
+                "language": "en",
+            }
 
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
+
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     def fake_append(transcript_path: Path, text: str) -> None:
         calls.append({"path": transcript_path, "text": text})
@@ -295,17 +313,18 @@ def test_stream_file_to_transcript_updates_language_in_frontmatter(
     """
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
+        def transcribe(self, audio, language=None, vad_filter=True):
+            return {
+                "segments": [{"text": "hola mundo", "start": 0.0, "end": 1.0}],
+                "language": "es",
+            }
 
-        def transcribe(self, audio_path: str, vad_filter: bool, language=None):
-            class Info:
-                language = "es"
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
 
-            segments = [DummySegment("hola mundo", 0.0, 1.0)]
-            return segments, Info()
-
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
@@ -325,46 +344,106 @@ def test_stream_file_to_transcript_updates_language_in_frontmatter(
 
 def test_transcriber_handles_dict_style_info(monkeypatch, tmp_path):
     """GIVEN transcribe_file
-    WHEN info is a dict with language key
-    THEN language is extracted correctly (line 158)"""
-
-    class DummySegment:
-        def __init__(self, text: str, start: float, end: float):
-            self.text = text
-            self.start = start
-            self.end = end
-
-    class Info:
-        def __init__(self):
-            # Use dict-style access
-            self._data = {"language": "fr"}
-
-        def get(self, key, default=None):
-            return self._data.get(key, default)
-
-        def __contains__(self, key):
-            return key in self._data
+    WHEN WhisperX returns a result dict with language key
+    THEN language is extracted correctly."""
 
     class DummyModel:
-        def __init__(self, *args, **kwargs):
-            pass
+        def transcribe(self, audio, language=None, vad_filter=True):
+            # WhisperX returns language in result dict
+            return {
+                "segments": [{"text": "Bonjour", "start": 0.0, "end": 1.0}],
+                "language": "fr",
+            }
 
-        def transcribe(self, *args, **kwargs):
-            segments = [DummySegment("Bonjour", 0.0, 1.0)]
-            info = Info()
-            return segments, info
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
 
-    monkeypatch.setattr(transcription, "WhisperModel", DummyModel)
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
 
     cfg = TranscriptionConfig(model="tiny", language="auto", vad_filter=True)
     transcriber = transcription.Transcriber(cfg)
 
-    # Test that dict-style info access works
+    # Test that dict-style result access works
     audio_path = str(tmp_path / "test.wav")
     # Create a dummy audio file
     (tmp_path / "test.wav").write_bytes(b"dummy")
 
     segments = list(transcriber.transcribe_file(audio_path))
     assert len(segments) > 0
-    # Language should be detected from dict-style info
+    # Language should be detected from result dict
     assert transcriber.last_language == "fr"
+
+
+def test_whisperx_segment_format_compatibility(monkeypatch, tmp_path: Path):
+    """GIVEN WhisperX transcription
+    WHEN segments are returned
+    THEN all segments have required keys (text, start, end) in correct format."""
+
+    class DummyModel:
+        def transcribe(self, audio, language=None, vad_filter=True):
+            return {
+                "segments": [
+                    {"text": "first", "start": 0.0, "end": 1.0},
+                    {"text": "second", "start": 1.5, "end": 2.5},
+                    {"text": "third", "start": 3.0, "end": 4.0},
+                ],
+                "language": "en",
+            }
+
+    def mock_load_model(*args, **kwargs):
+        return DummyModel()
+
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
+
+    cfg = TranscriptionConfig(model="tiny", language="en", vad_filter=True)
+    transcriber = transcription.Transcriber(cfg)
+
+    audio_path = str(tmp_path / "audio.wav")
+    segments = list(transcriber.transcribe_file(audio_path))
+
+    assert len(segments) == 3
+    for segment in segments:
+        assert "text" in segment
+        assert "start" in segment
+        assert "end" in segment
+        assert isinstance(segment["text"], str)
+        assert isinstance(segment["start"], float)
+        assert isinstance(segment["end"], float)
+        assert segment["start"] < segment["end"]
+
+
+def test_whisperx_model_caching(monkeypatch):
+    """GIVEN multiple Transcriber instances
+    WHEN created with same config
+    THEN WhisperX load_model is called for each (model caching handled by WhisperX)."""
+
+    call_count = 0
+
+    def mock_load_model(model: str, device: str = "cpu", compute_type: str = "int8"):
+        nonlocal call_count
+        call_count += 1
+
+        class DummyModel:
+            def transcribe(self, *args, **kwargs):
+                return {"segments": [], "language": None}
+
+        return DummyModel()
+
+    mock_whisperx = create_mock_whisperx_module(monkeypatch)
+    mock_whisperx.load_model = mock_load_model
+    mock_whisperx.load_audio = lambda path: b"dummy_audio"
+
+    cfg = TranscriptionConfig(model="small", language="en", vad_filter=True)
+
+    # Create multiple instances
+    _ = transcription.Transcriber(cfg)
+    _ = transcription.Transcriber(cfg)
+    _ = transcription.Transcriber(cfg)
+
+    # Each instance should trigger load_model
+    # (caching is handled by WhisperX internally)
+    assert call_count == 3

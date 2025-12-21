@@ -1,6 +1,6 @@
 # 🎙️ Rejoice v2 - Development Backlog
 
-**Last Updated:** December 19, 2025
+**Last Updated:** January 20, 2025
 **Status:** Ready for Development
 **Target:** v2.0.0 Release
 
@@ -9,9 +9,9 @@
 ## 📊 Progress Overview
 
 - **Total Stories:** 88
-- **Completed:** 25
+- **Completed:** 26
 - **In Progress:** 0
-- **Not Started:** 63
+- **Not Started:** 62
 
 ---
 
@@ -1795,23 +1795,23 @@ def process(files: List[Path]):
 ### [T-011] Migrate from faster-whisper to WhisperX
 **Priority:** High
 **Estimate:** M (4-8h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [T-001, T-003, T-009]
 
 **User Story:**
 As a developer, I want to use WhisperX as the transcription engine so that we have a foundation for future features like timestamps and speaker diarization, while maintaining all existing single-pass transcription functionality.
 
 **Acceptance Criteria:**
-- [ ] Replace faster-whisper with WhisperX in Transcriber class
-- [ ] Maintain backward compatibility with existing API (same segment format)
-- [ ] All existing transcription features continue to work (VAD, language detection, single-pass)
-- [ ] Single-pass transcription after recording ([T-009]) continues to function identically
-- [ ] Model loading and caching behavior unchanged
-- [ ] Update dependencies: whisperx replaces faster-whisper in requirements
-- [ ] Update [A-001] dependency from [T-001] to [T-011]
-- [ ] All existing tests pass without modification
-- [ ] Performance is equivalent or better than faster-whisper baseline
-- [ ] Update documentation to reflect WhisperX usage
+- [x] Replace faster-whisper with WhisperX in Transcriber class
+- [x] Maintain backward compatibility with existing API (same segment format)
+- [x] All existing transcription features continue to work (VAD, language detection, single-pass)
+- [x] Single-pass transcription after recording ([T-009]) continues to function identically
+- [x] Model loading and caching behavior unchanged
+- [x] Update dependencies: whisperx replaces faster-whisper in requirements
+- [x] Update [A-001] dependency from [T-001] to [T-011]
+- [x] All existing tests pass without modification
+- [x] Performance is equivalent or better than faster-whisper baseline
+- [x] Update documentation to reflect WhisperX usage
 
 **Technical Notes:**
 ```python

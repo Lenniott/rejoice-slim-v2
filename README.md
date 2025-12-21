@@ -56,7 +56,7 @@ pre-commit install
 
 # Download transcription model (one-time, required for local-only operation)
 # This downloads the model to local cache - after this, no internet needed
-python3 -c "from faster_whisper import WhisperModel; WhisperModel('medium', local_files_only=False)"
+python3 -c "import whisperx; whisperx.load_model('medium', device='cpu', compute_type='int8')"
 
 # Run tests
 pytest
@@ -75,7 +75,7 @@ rejoice-v2/
 
 ## Technology Stack
 
-- **faster-whisper** - Transcription engine (4x faster than openai-whisper)
+- **WhisperX** - Transcription engine (uses faster-whisper under the hood, 4x faster than openai-whisper)
 - **sounddevice** - Audio recording
 - **ollama** - Local AI enhancement
 - **rich** - Terminal UI

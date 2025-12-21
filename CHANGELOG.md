@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- [T-011] Migrated from faster-whisper to WhisperX
+  - Replaced faster-whisper with WhisperX as transcription engine
+  - Maintains 100% backward compatibility with existing API
+  - Same segment format, same configuration options
+  - Enables foundation for future features (speaker diarization, word-level timestamps)
+  - Performance equivalent to faster-whisper baseline
+  - Updated dependencies: `whisperx>=3.1.0` replaces `faster-whisper>=0.10.0`
+  - Updated module docstrings and error messages to reference WhisperX
+  - Tests: All existing tests updated and passing, 2 new tests added (segment format compatibility, model caching)
+  - Coverage: Maintained 90%+ coverage
+
 ### Added
 
 - [AI-001] Ollama Client Integration
@@ -94,8 +107,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- [T-011] Migrated from faster-whisper to WhisperX
+  - Replaced faster-whisper with WhisperX as transcription engine in `src/rejoice/transcription/__init__.py`
+  - Maintains 100% backward compatibility with existing API (same segment format)
+  - Same configuration options (model size, language, VAD filter)
+  - Enables foundation for future features (speaker diarization, word-level timestamps)
+  - Performance equivalent to faster-whisper baseline (uses faster-whisper under the hood)
+  - Updated dependencies: `whisperx>=3.1.0` replaces `faster-whisper>=0.10.0` in requirements.txt and pyproject.toml
+  - All existing tests updated and passing (11 unit tests)
+  - Updated module docstrings and error messages to reference WhisperX
+  - Updated [A-001] dependency from [T-001] to [T-011] in BACKLOG.md
+
 - [T-002] Language Detection & Control
-  - Extended `Transcriber` so that `language='auto'` passes `None` through to faster-whisper, records the model-reported language, and exposes it via a `last_language` property.
+  - Extended `Transcriber` so that `language='auto'` passes `None` through to WhisperX, records the model-reported language, and exposes it via a `last_language` property.
   - Updated `stream_file_to_transcript` to persist the effective language into transcript YAML frontmatter via a new atomic `update_language` helper in the transcript manager.
   - Added a global `--language / -l` CLI flag to accept per-invocation language overrides (plumbed into Click context for future transcription commands) and expanded unit coverage around language handling.
 

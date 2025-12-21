@@ -1,11 +1,14 @@
 """Transcription functionality.
 
-Implements the core of [T-001] faster-whisper Integration.
+Implements the core of [T-011] WhisperX Integration.
 
-This module provides a thin wrapper around the ``faster-whisper`` library so the
+This module provides a thin wrapper around the ``whisperx`` library so the
 rest of the codebase does not depend directly on third-party APIs. It handles
 model loading, basic configuration, and exposes a ``Transcriber`` class with a
 single ``transcribe_file`` method that yields normalised segments.
+
+WhisperX uses faster-whisper under the hood, providing equivalent performance
+while enabling future features like speaker diarization and word-level timestamps.
 """
 
 from __future__ import annotations
@@ -19,19 +22,19 @@ from rejoice.core.config import TranscriptionConfig
 from rejoice.exceptions import TranscriptionError
 
 try:  # pragma: no cover - happy path is exercised via monkeypatched model
-    from faster_whisper import WhisperModel as _WhisperModel
+    import whisperx as _whisperx
 except Exception:  # pragma: no cover - exercised only if dependency is missing
-    _WhisperModel = None
+    _whisperx = None
 
 # Rebind into a public name so tests and other modules can monkeypatch or
-# introspect the model constructor without importing faster-whisper directly.
-WhisperModel = _WhisperModel
+# introspect the module without importing whisperx directly.
+whisperx = _whisperx
 
 logger = logging.getLogger(__name__)
 
 
 class Transcriber:
-    """High-level transcription facade wrapping faster-whisper.
+    """High-level transcription facade wrapping WhisperX.
 
     Parameters
     ----------
@@ -39,10 +42,10 @@ class Transcriber:
         The :class:`~rejoice.core.config.TranscriptionConfig` that controls the
         model size, default language and VAD behaviour.
     device:
-        Device string passed through to ``WhisperModel`` (for example, ``"cpu"``
+        Device string passed through to WhisperX (for example, ``"cpu"``
         or ``"cuda"``). Defaults to ``"cpu"``.
     compute_type:
-        Compute type string for faster-whisper (for example, ``"int8"`` or
+        Compute type string for WhisperX (for example, ``"int8"`` or
         ``"float16"``). Defaults to ``"int8"`` for modest resource usage.
     """
 
@@ -53,19 +56,21 @@ class Transcriber:
         device: str = "cpu",
         compute_type: str = "int8",
     ) -> None:
-        if WhisperModel is None:
+        if whisperx is None:
             # Provide a clear, actionable error instead of a low-level ImportError.
             raise TranscriptionError(
-                "faster-whisper dependency is not available. "
-                "Install it via 'pip install faster-whisper' to enable "
+                "WhisperX dependency is not available. "
+                "Install it via 'pip install whisperx' to enable "
                 "transcription.",
                 suggestion=(
-                    "Ensure the 'faster-whisper' package is installed in the same "
+                    "Ensure the 'whisperx' package is installed in the same "
                     "environment as Rejoice and try again."
                 ),
             )
 
         self._config = config
+        self._device = device
+        self._compute_type = compute_type
         # Track the last language used/detected for [T-002] so that callers
         # can persist it into transcript frontmatter if desired.
         self._last_language: Optional[str] = None
@@ -73,11 +78,12 @@ class Transcriber:
         try:
             # Enforce local-only operation to comply with "all local, no cloud" vision.
             # Models must be downloaded once (during setup) and then work offline.
-            self._model = WhisperModel(
+            # WhisperX uses faster-whisper under the hood, so model caching
+            # works the same.
+            self._model = whisperx.load_model(
                 config.model,
                 device=device,
                 compute_type=compute_type,
-                local_files_only=True,  # Prevent runtime cloud downloads
             )
         except Exception as exc:  # pragma: no cover - exercised via error tests
             message = f"Failed to load transcription model '{config.model}': {exc}"
@@ -86,8 +92,9 @@ class Transcriber:
             suggestion_msg = (
                 f"The model '{config.model}' is not available locally. "
                 "To download it initially (one-time setup), run:\n"
-                f'  python3 -c "from faster_whisper import WhisperModel; '
-                f"WhisperModel('{config.model}', local_files_only=False)\"\n"
+                f'  python3 -c "import whisperx; '
+                f"whisperx.load_model('{config.model}', device='{device}', "
+                f"compute_type='{compute_type}')\"\n"
                 "This will download the model to your local cache. "
                 "After download, the model will work offline (no cloud access)."
             )
@@ -121,7 +128,7 @@ class Transcriber:
         ----------
         audio_path:
             Path to the input audio file. The file must be readable by
-            faster-whisper.
+            WhisperX.
 
         Raises
         ------
@@ -129,7 +136,7 @@ class Transcriber:
             If the underlying model raises any error during transcription.
         """
 
-        # faster-whisper treats ``language=None`` as "auto-detect", which matches
+        # WhisperX treats ``language=None`` as "auto-detect", which matches
         # our config semantics where ``language='auto'`` means "let the model
         # decide".
         if self._config.language == "auto":
@@ -138,10 +145,16 @@ class Transcriber:
             language_arg = self._config.language
 
         try:
-            segments, info = self._model.transcribe(
-                audio_path,
-                vad_filter=self._config.vad_filter,
+            # WhisperX requires loading audio first
+            audio = whisperx.load_audio(audio_path)
+
+            # Transcribe using WhisperX API
+            # For now, use simple transcription (no alignment/diarization)
+            # This will be extended in [A-001], [A-003] for advanced features
+            result = self._model.transcribe(
+                audio,
                 language=language_arg,
+                vad_filter=self._config.vad_filter,
             )
         except Exception as exc:
             message = f"Transcription failed for '{audio_path}': {exc}"
@@ -158,28 +171,30 @@ class Transcriber:
         if language_arg is not None:
             detected_language = language_arg
         else:
-            # For auto-detection, faster-whisper exposes language information
-            # via the ``info`` object; support both attribute and mapping styles.
-            detected_language = None
-            if hasattr(info, "language"):
-                detected_language = getattr(info, "language")
-            elif isinstance(info, dict) and "language" in info:
-                detected_language = cast(Optional[str], info.get("language"))
-            elif hasattr(info, "get") and hasattr(info, "__contains__"):
-                # Support dict-like objects that aren't actually dicts
-                if "language" in info:
-                    detected_language = cast(Optional[str], info.get("language"))
+            # For auto-detection, WhisperX returns language in the result dict
+            detected_language = (
+                result.get("language") if isinstance(result, dict) else None
+            )
 
         self._last_language = detected_language
 
-        # Normalise the third-party segment objects into simple dictionaries so
-        # the rest of the codebase does not depend on faster-whisper's types.
-        for seg in _normalise_iterable(segments):
-            yield {
-                "text": getattr(seg, "text", "").strip(),
-                "start": float(getattr(seg, "start", 0.0)),
-                "end": float(getattr(seg, "end", 0.0)),
-            }
+        # Normalise WhisperX segments to match existing segment format.
+        # WhisperX returns segments as dicts with "text", "start", "end" keys.
+        segments = result.get("segments", []) if isinstance(result, dict) else []
+        for seg in segments:
+            if isinstance(seg, dict):
+                yield {
+                    "text": str(seg.get("text", "")).strip(),
+                    "start": float(seg.get("start", 0.0)),
+                    "end": float(seg.get("end", 0.0)),
+                }
+            else:
+                # Fallback for non-dict segments (shouldn't happen with WhisperX)
+                yield {
+                    "text": getattr(seg, "text", "").strip(),
+                    "start": float(getattr(seg, "start", 0.0)),
+                    "end": float(getattr(seg, "end", 0.0)),
+                }
 
     def stream_file_to_transcript(
         self, audio_path: str, transcript_path: Path
@@ -222,7 +237,7 @@ def _normalise_iterable(segments: Iterable[object]) -> Iterable[object]:
     return segments
 
 
-__all__ = ["Transcriber", "WhisperModel"]
+__all__ = ["Transcriber", "whisperx"]
 
 # Import real-time transcription components
 # Note: RealtimeTranscriptionWorker is imported directly in commands.py

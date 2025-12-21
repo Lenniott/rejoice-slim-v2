@@ -311,10 +311,10 @@ def start_recording_session(
         # 5. Run single transcription pass with progress bar
         console.print("\n🔄 Transcribing...")
         try:
-            # Suppress verbose INFO logs from faster-whisper, huggingface, httpx
-            # These libraries log model downloads/checks which are noisy
-            # Note: Models are cached locally - HTTP request is just a version
-            # check, not a download
+            # Suppress verbose INFO logs from WhisperX (which uses faster-whisper),
+            # huggingface, httpx. These libraries log model downloads/checks which
+            # are noisy. Note: Models are cached locally - HTTP request is just a
+            # version check, not a download
             import logging
 
             # Get root logger and its console handler
@@ -331,8 +331,11 @@ def start_recording_session(
                     break
 
             # Also suppress at logger level for noisy libraries
+            # WhisperX uses faster-whisper under the hood, so we still need to
+            # suppress faster_whisper logs
             noisy_loggers = [
                 "faster_whisper",
+                "whisperx",
                 "huggingface_hub",
                 "httpx",
                 "httpcore",

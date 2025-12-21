@@ -156,7 +156,7 @@ class RealtimeTranscriptionWorker:
             # Concatenate accumulated audio
             audio_array = np.concatenate(self.accumulated_audio)
 
-            # Save to temporary WAV file for faster-whisper
+            # Save to temporary WAV file for WhisperX
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
                 tmp_path = Path(tmp_file.name)
 

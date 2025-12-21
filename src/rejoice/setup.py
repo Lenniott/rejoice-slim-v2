@@ -26,9 +26,9 @@ from rejoice.core.config import get_config_dir, get_default_config
 from rejoice.transcript.manager import create_transcript
 
 try:
-    from faster_whisper import WhisperModel
+    import whisperx
 except ImportError:  # pragma: no cover
-    WhisperModel = None
+    whisperx = None
 
 if TYPE_CHECKING:
     from ollama import Client as Ollama
@@ -113,17 +113,18 @@ def download_whisper_model(model: str, check_only: bool = False) -> bool:
         True if model is available (or was successfully downloaded),
         False if download failed.
     """
-    if WhisperModel is None:
+    if whisperx is None:
         console.print(
-            "[red]Error: faster-whisper is not installed.[/red]\n"
-            "Please install it with: pip install faster-whisper"
+            "[red]Error: WhisperX is not installed.[/red]\n"
+            "Please install it with: pip install whisperx"
         )
         return False
 
     # First, check if model exists locally
     try:
-        # Try to load with local_files_only=True to check if it exists
-        WhisperModel(model, device="cpu", local_files_only=True)
+        # Try to load with WhisperX to check if it exists
+        # WhisperX uses faster-whisper under the hood, which handles local caching
+        whisperx.load_model(model, device="cpu", compute_type="int8")
         if check_only:
             return True
         console.print(f"[green]✓ Model '{model}' is already downloaded[/green]")
@@ -140,8 +141,8 @@ def download_whisper_model(model: str, check_only: bool = False) -> bool:
     )
 
     try:
-        # Download with local_files_only=False
-        WhisperModel(model, device="cpu", local_files_only=False)
+        # Download with WhisperX (it will download if not cached)
+        whisperx.load_model(model, device="cpu", compute_type="int8")
         console.print(f"[green]✓ Model '{model}' downloaded successfully[/green]\n")
         return True
     except Exception as exc:

@@ -69,10 +69,10 @@ def test_model_download_if_not_exists():
     from rejoice.setup import download_whisper_model
 
     mock_model = MagicMock()
-    with patch("rejoice.setup.WhisperModel", return_value=mock_model) as mock_whisper:
-        # First call with local_files_only=True should fail (model not found)
-        # Second call with local_files_only=False should succeed (download)
-        mock_whisper.side_effect = [
+    with patch("rejoice.setup.whisperx") as mock_whisperx:
+        # First call should fail (model not found locally)
+        # Second call should succeed (download)
+        mock_whisperx.load_model.side_effect = [
             Exception("Model not found locally"),
             mock_model,
         ]
@@ -80,7 +80,7 @@ def test_model_download_if_not_exists():
         with patch("rejoice.setup.console"):
             download_whisper_model("tiny", check_only=False)
             # Should attempt download
-            assert mock_whisper.call_count >= 1
+            assert mock_whisperx.load_model.call_count >= 1
 
 
 def test_model_download_skips_if_exists():
@@ -90,11 +90,13 @@ def test_model_download_skips_if_exists():
     from rejoice.setup import download_whisper_model
 
     mock_model = MagicMock()
-    with patch("rejoice.setup.WhisperModel", return_value=mock_model):
+    with patch("rejoice.setup.whisperx") as mock_whisperx:
+        mock_whisperx.load_model.return_value = mock_model
         with patch("rejoice.setup.console"):
             download_whisper_model("tiny", check_only=True)
             # Should not show download message if already exists
             # (check_only=True means we're just verifying, not downloading)
+            assert mock_whisperx.load_model.called
 
 
 def test_test_microphone():
