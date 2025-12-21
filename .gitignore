@@ -74,3 +74,4 @@ temp/
 docs/_build/
 docs/.doctrees/
 .claude/
+.cursor/
