@@ -44,9 +44,9 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 - Recording polish:
   - ❌ [R-010], ❌ [R-011], ❌  [R-013]
 - Transcription usability:
-  - ❌ [T-004]
+  - ❌ [T-004], ❌ [T-006]
 - Advanced transcription features:
-  - ❌ [A-001], ❌ [A-002], ❌ [A-003], ❌ [A-004],
+  - ✅ [A-001], ❌ [A-002], ❌ [A-003], ❌ [A-004],
 - CLI quality of life:
   - ❌ [C-004], ❌ [C-005], ❌ [C-009], ❌ [C-011]
 - Settings & configuration:
@@ -1888,7 +1888,7 @@ class Transcriber:
 ### [A-001] WhisperX Integration
 **Priority:** Medium
 **Estimate:** L (1-2d)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [T-011]
 
 **User Story:**

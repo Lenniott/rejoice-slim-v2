@@ -8,5 +8,6 @@ from .manager import (  # noqa: F401
     create_transcript,
     generate_frontmatter,
     get_next_id,
+    parse_transcript_filename,
     write_file_atomic,
 )

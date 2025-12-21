@@ -32,8 +32,8 @@ def test_create_transcript_creates_file_and_directory():
         # ID should be 6-digit zero-padded
         assert tid == "000001"
 
-        # Filename should match transcript_YYYYMMDD_ID.md
-        pattern = r"^transcript_\d{8}_000001\.md$"
+        # Filename should match new format: ID_transcript_YYYYMMDD.md
+        pattern = r"^000001_transcript_\d{8}\.md$"
         assert re.match(pattern, filepath.name)
 
         content = read_file(filepath)
@@ -95,7 +95,8 @@ def test_create_transcript_avoids_duplicate_ids():
 
         assert filepath.exists()
         assert tid == "000002"
-        assert filepath.name.endswith("_000002.md")
+        # New format: ID_transcript_YYYYMMDD.md
+        assert filepath.name.startswith("000002_transcript_")
 
 
 def test_frontmatter_contains_expected_fields():
@@ -452,7 +453,8 @@ def test_create_transcript_handles_collision_retry(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:
         save_dir = Path(tmpdir)
         # Create a file that would cause collision (using the same date as mocked)
-        (save_dir / "transcript_20250101_000001.md").write_text("existing")
+        # Use new format: ID_transcript_YYYYMMDD.md
+        (save_dir / "000001_transcript_20250101.md").write_text("existing")
 
         # Mock get_next_id to return same ID first time, then next
         call_count = [0]
@@ -522,3 +524,94 @@ def test_update_language_handles_invalid_yaml():
 
         with pytest.raises(manager.TranscriptError, match="invalid YAML"):
             manager.update_language(filepath, "en")
+
+
+# Tests for R-011: Filename Order Normalisation
+
+
+def test_create_transcript_uses_new_format():
+    """GIVEN create_transcript is called
+    WHEN a new transcript is created
+    THEN it uses the new format: ID_transcript_YYYYMMDD.md"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+
+        filepath, tid = manager.create_transcript(save_dir)
+
+        # Should use new format: {ID}_transcript_{YYYYMMDD}.md
+        pattern = rf"^{tid}_transcript_\d{{8}}\.md$"
+        assert re.match(
+            pattern, filepath.name
+        ), f"Filename {filepath.name} doesn't match new format"
+
+
+def test_get_next_id_recognizes_old_format():
+    """GIVEN old-format files exist
+    WHEN get_next_id is called
+    THEN it finds IDs from old-format files"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        # Create old-format files
+        (save_dir / "transcript_20250120_000001.md").write_text("test")
+        (save_dir / "transcript_20250121_000005.md").write_text("test")
+
+        next_id = manager.get_next_id(save_dir)
+
+        assert next_id == "000006"
+
+
+def test_get_next_id_recognizes_new_format():
+    """GIVEN new-format files exist
+    WHEN get_next_id is called
+    THEN it finds IDs from new-format files"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        # Create new-format files
+        (save_dir / "000001_transcript_20250120.md").write_text("test")
+        (save_dir / "000005_transcript_20250121.md").write_text("test")
+
+        next_id = manager.get_next_id(save_dir)
+
+        assert next_id == "000006"
+
+
+def test_get_next_id_handles_mixed_formats():
+    """GIVEN both old and new format files exist
+    WHEN get_next_id is called
+    THEN it correctly finds the max ID from both formats"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+        # Create mixed format files
+        (save_dir / "transcript_20250120_000001.md").write_text("test")  # Old format
+        (save_dir / "000005_transcript_20250121.md").write_text("test")  # New format
+        (save_dir / "transcript_20250122_000003.md").write_text("test")  # Old format
+        (save_dir / "000010_transcript_20250123.md").write_text("test")  # New format
+
+        next_id = manager.get_next_id(save_dir)
+
+        # Should find max ID (000010) and return next (000011)
+        assert next_id == "000011"
+
+
+def test_parse_transcript_filename_old_format():
+    """GIVEN an old-format filename
+    WHEN parse_transcript_filename is called
+    THEN it returns date and ID correctly"""
+    result = manager.parse_transcript_filename("transcript_20250120_000042.md")
+    assert result == ("20250120", "000042")
+
+
+def test_parse_transcript_filename_new_format():
+    """GIVEN a new-format filename
+    WHEN parse_transcript_filename is called
+    THEN it returns ID and date correctly"""
+    result = manager.parse_transcript_filename("000042_transcript_20250120.md")
+    assert result == ("20250120", "000042")
+
+
+def test_parse_transcript_filename_invalid():
+    """GIVEN an invalid filename
+    WHEN parse_transcript_filename is called
+    THEN it raises TranscriptError"""
+    with pytest.raises(manager.TranscriptError):
+        manager.parse_transcript_filename("invalid_filename.md")

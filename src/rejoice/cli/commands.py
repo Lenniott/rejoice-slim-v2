@@ -27,10 +27,11 @@ from rejoice.core.logging import setup_logging
 from rejoice.exceptions import TranscriptError
 from rejoice.transcription import Transcriber
 from rejoice.transcript.manager import (
-    TRANSCRIPT_FILENAME_PATTERN,
     append_to_transcript,
     create_transcript,
+    migrate_filenames,
     normalize_id,
+    parse_transcript_filename,
     update_language,
     update_status,
 )
@@ -393,7 +394,11 @@ def start_recording_session(
 
 
 def _iter_transcripts(save_dir: Path) -> list[Path]:
-    """Yield transcript files in the given directory matching the standard pattern."""
+    """Yield transcript files in the given directory matching the standard pattern.
+
+    Supports both old format (transcript_YYYYMMDD_ID.md) and
+    new format (ID_transcript_YYYYMMDD.md).
+    """
     if not save_dir.exists():
         return []
 
@@ -401,14 +406,17 @@ def _iter_transcripts(save_dir: Path) -> list[Path]:
     for entry in save_dir.iterdir():
         if not entry.is_file():
             continue
-        if TRANSCRIPT_FILENAME_PATTERN.match(entry.name):
+        # Use parse_transcript_filename to check if it's a valid transcript file
+        try:
+            parse_transcript_filename(entry.name)
             files.append(entry)
+        except TranscriptError:
+            # Not a transcript file, skip it
+            continue
 
     # Sort by date (derived from filename) and ID, newest first.
     def sort_key(path: Path) -> tuple[str, str]:
-        match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
-        assert match is not None  # Covered by construction above
-        date_str, id_str = match.groups()
+        date_str, id_str = parse_transcript_filename(path.name)
         return (date_str, id_str)
 
     files.sort(key=sort_key, reverse=True)
@@ -434,19 +442,20 @@ def _get_transcript_path_by_id(save_dir: Path, user_supplied_id: str) -> Path | 
 
     The ID is normalised via :func:`normalize_id` to allow flexible input
     (for example ``"1"`` or ``"000001"``) while still relying on the
-    standard filename pattern.
+    standard filename pattern. Supports both old and new filename formats.
     """
     normalised_id = normalize_id(user_supplied_id)
 
     for entry in save_dir.iterdir():
         if not entry.is_file():
             continue
-        match = TRANSCRIPT_FILENAME_PATTERN.match(entry.name)
-        if not match:
+        try:
+            _date_str, id_str = parse_transcript_filename(entry.name)
+            if id_str == normalised_id:
+                return entry
+        except TranscriptError:
+            # Not a transcript file, skip it
             continue
-        _date_str, id_str = match.groups()
-        if id_str == normalised_id:
-            return entry
 
     return None
 
@@ -541,12 +550,13 @@ def list_recordings(limit: int = 50):
     table.add_column("Filename")
 
     for path in transcripts:
-        match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
-        if not match:
+        try:
+            date_str, id_str = parse_transcript_filename(path.name)
+            formatted_date = f"{date_str[0:4]}-{date_str[4:6]}-{date_str[6:8]}"
+            table.add_row(id_str, formatted_date, path.name)
+        except TranscriptError:
+            # Skip invalid filenames (shouldn't happen due to filtering)
             continue
-        date_str, id_str = match.groups()
-        formatted_date = f"{date_str[0:4]}-{date_str[4:6]}-{date_str[6:8]}"
-        table.add_row(id_str, formatted_date, path.name)
 
     console.print(table)
 
@@ -597,6 +607,87 @@ def view_transcript(transcript_id: str, show_frontmatter: bool) -> None:
 
     markdown = Markdown(body or "")
     console.print(markdown)
+
+
+@main.command("migrate")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview changes without modifying files",
+)
+@click.option(
+    "--execute",
+    is_flag=True,
+    default=False,
+    help="Perform the migration (requires confirmation)",
+)
+def migrate_command(dry_run: bool, execute: bool):
+    """Migrate transcript filenames from old format to new format.
+
+    Old format: transcript_YYYYMMDD_ID.md
+    New format: ID_transcript_YYYYMMDD.md
+
+    Use --dry-run to preview changes without modifying files.
+    Use --execute to perform the migration.
+    """
+    if not dry_run and not execute:
+        console.print("[yellow]Please specify either --dry-run or --execute[/yellow]")
+        console.print("Use --help for more information")
+        return
+
+    if dry_run and execute:
+        console.print("[yellow]Cannot use both --dry-run and --execute[/yellow]")
+        return
+
+    config = load_config()
+    save_dir = Path(config.output.save_path).expanduser()
+
+    if not save_dir.exists():
+        console.print(
+            f"[yellow]Transcript directory does not exist: {save_dir}[/yellow]"
+        )
+        return
+
+        if dry_run:
+            console.print("[bold]Dry-run mode: No files will be modified[/bold]\n")
+            result = migrate_filenames(save_dir, dry_run=True)
+
+            if not result["operations"]:
+                console.print("No files found matching old format.")
+                return
+
+            console.print(f"Found {len(result['operations'])} file(s) to migrate:\n")
+            for old_path, new_path in result["operations"]:
+                console.print(f"  {old_path.name} → {new_path.name}")
+
+            console.print(f"\n[green]Would rename {result['renamed']} file(s)[/green]")
+            if result["failed"] > 0:
+                console.print(f"[red]Would fail {result['failed']} file(s)[/red]")
+                for error in result["errors"]:
+                    console.print(f"  [red]{error}[/red]")
+
+    if execute:
+        console.print("[bold]Migration mode: Files will be renamed[/bold]\n")
+
+        # Confirm before proceeding
+        if not Confirm.ask("Do you want to proceed with the migration?"):
+            console.print("[yellow]Migration cancelled[/yellow]")
+            return
+
+        result = migrate_filenames(save_dir, dry_run=False)
+
+        if not result["operations"]:
+            console.print("No files found matching old format.")
+            return
+
+        console.print(
+            f"\n[green]Successfully renamed {result['renamed']} file(s)[/green]"
+        )
+        if result["failed"] > 0:
+            console.print(f"[red]Failed to rename {result['failed']} file(s)[/red]")
+            for error in result["errors"]:
+                console.print(f"  [red]{error}[/red]")
 
 
 # Add config subcommand group
