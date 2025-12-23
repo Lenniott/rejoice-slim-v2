@@ -75,7 +75,7 @@ def test_main_starts_recording_when_no_subcommand(monkeypatch, tmp_path):
     ) -> Tuple[Path, str]:
         calls["started"] = True
         # Return dummy path/id to satisfy any callers
-        return tmp_path / "transcript_20250101_000001.md", "000001"
+        return tmp_path / "000001_transcript_20250101.md", "000001"
 
     # Mock load_config to avoid permission errors with default save path
     from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
@@ -116,7 +116,7 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
     # Fake transcript creation that records order and returns a path/id
     def fake_create_transcript(save_dir: Path):
         events.append("create_transcript")
-        transcript_path = tmp_path / "transcript_20250101_000001.md"
+        transcript_path = tmp_path / "000001_transcript_20250101.md"
         # Simulate that file would be created by manager without touching disk here
         return transcript_path, "000001"
 
@@ -234,7 +234,7 @@ def test_start_recording_creates_transcript_before_audio(monkeypatch, tmp_path):
     assert events[0:2] == ["create_transcript", "record_audio"]
 
     # The helper should return values from create_transcript
-    assert filepath.name == "transcript_20250101_000001.md"
+    assert filepath.name == "000001_transcript_20250101.md"
     assert transcript_id == "000001"
 
     # The fake stream should be stopped and closed
@@ -273,7 +273,7 @@ def test_start_recording_marks_transcript_completed(monkeypatch, tmp_path):
     events: List[object] = []
 
     # Use a real file path so status update helpers have something to operate on
-    transcript_path = tmp_path / "transcript_20250101_000010.md"
+    transcript_path = tmp_path / "000010_transcript_20250101.md"
     transcript_path.write_text("initial content", encoding="utf-8")
 
     def fake_create_transcript(save_dir: Path):
@@ -403,7 +403,7 @@ def test_start_recording_handles_ctrl_c_and_marks_cancelled(monkeypatch, tmp_pat
     """
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000020.md"
+    transcript_path = tmp_path / "000020_transcript_20250101.md"
     transcript_path.write_text("initial content", encoding="utf-8")
 
     def fake_create_transcript(save_dir: Path):
@@ -615,9 +615,9 @@ def test_list_recordings_shows_transcripts_sorted_newest_first(monkeypatch, tmp_
     save_dir.mkdir()
 
     # Create a few transcript files that match the manager naming pattern
-    first = save_dir / "transcript_20250101_000001.md"
-    second = save_dir / "transcript_20250102_000002.md"
-    third = save_dir / "transcript_20250103_000003.md"
+    first = save_dir / "000001_transcript_20250101.md"
+    second = save_dir / "000002_transcript_20250102.md"
+    third = save_dir / "000003_transcript_20250103.md"
 
     for path in (first, second, third):
         path.write_text("dummy content", encoding="utf-8")
@@ -666,7 +666,7 @@ def test_view_transcript_by_id_hides_frontmatter_by_default(monkeypatch, tmp_pat
     save_dir = tmp_path / "transcripts"
     save_dir.mkdir()
 
-    transcript_path = save_dir / "transcript_20250101_000001.md"
+    transcript_path = save_dir / "000001_transcript_20250101.md"
     transcript_path.write_text(
         (
             "---\n"
@@ -722,7 +722,7 @@ def test_view_transcript_with_show_frontmatter_displays_metadata(
     save_dir = tmp_path / "transcripts"
     save_dir.mkdir()
 
-    transcript_path = save_dir / "transcript_20250102_000010.md"
+    transcript_path = save_dir / "000010_transcript_20250102.md"
     transcript_path.write_text(
         (
             "---\n"
@@ -774,8 +774,8 @@ def test_view_latest_shows_most_recent_transcript(monkeypatch, tmp_path):
     save_dir = tmp_path / "transcripts"
     save_dir.mkdir()
 
-    older = save_dir / "transcript_20250101_000001.md"
-    newer = save_dir / "transcript_20250102_000002.md"
+    older = save_dir / "000001_transcript_20250101.md"
+    newer = save_dir / "000002_transcript_20250102.md"
 
     older.write_text(
         (
@@ -886,7 +886,7 @@ def test_recording_saves_audio_to_temp_file(monkeypatch, tmp_path):
     events: List[object] = []
     audio_data_written: List[bytes] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
 
     # Mock config to use tmp_path
@@ -996,7 +996,7 @@ def test_transcription_runs_after_recording_stops(monkeypatch, tmp_path):
     THEN transcription is automatically run on the temporary audio file."""
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -1141,7 +1141,7 @@ def test_transcription_appends_text_to_transcript(monkeypatch, tmp_path):
     """GIVEN a completed recording session
     WHEN transcription runs
     THEN transcribed text is appended to the transcript file."""
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -1279,7 +1279,7 @@ def test_temp_file_cleanup_on_success(monkeypatch, tmp_path):
     """GIVEN a successful recording and transcription
     WHEN transcription completes
     THEN the temporary audio file is deleted."""
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -1415,7 +1415,7 @@ def test_transcription_error_handled_gracefully(monkeypatch, tmp_path):
     """GIVEN a recording session
     WHEN transcription fails
     THEN the error is handled gracefully without crashing the CLI."""
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -1550,7 +1550,7 @@ def test_cancelled_recording_skips_transcription(monkeypatch, tmp_path):
     THEN transcription is not attempted."""
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
 
     # Mock config
@@ -1690,7 +1690,7 @@ def test_language_flag_passed_to_transcriber(monkeypatch, tmp_path):
     THEN the language override is passed to Transcriber."""
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -1836,7 +1836,7 @@ def test_start_recording_user_does_not_confirm_cancellation(monkeypatch, tmp_pat
     THEN recording continues (cancelled = False)"""
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000030.md"
+    transcript_path = tmp_path / "000030_transcript_20250101.md"
     # Create a proper transcript file with frontmatter
     transcript_path.write_text(
         "---\n"
@@ -2015,7 +2015,7 @@ def test_start_recording_cancelled_keeps_file(monkeypatch, tmp_path):
     THEN transcript is marked as cancelled (else branch line 170)"""
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000040.md"
+    transcript_path = tmp_path / "000040_transcript_20250101.md"
     # Create a proper transcript file with frontmatter
     transcript_path.write_text(
         "---\n"
@@ -2186,7 +2186,7 @@ def test_iter_transcripts_skips_non_files(monkeypatch, tmp_path):
     subdir.mkdir()
 
     # Create a transcript file (should be included)
-    transcript_file = save_dir / "transcript_20250101_000001.md"
+    transcript_file = save_dir / "000001_transcript_20250101.md"
     transcript_file.write_text("test")
 
     result = _iter_transcripts(save_dir)
@@ -2278,8 +2278,8 @@ def test_list_recordings_shows_table_with_transcripts(monkeypatch, tmp_path):
     save_dir.mkdir()
 
     # Create some transcript files
-    (save_dir / "transcript_20250101_000001.md").write_text("test1")
-    (save_dir / "transcript_20250102_000002.md").write_text("test2")
+    (save_dir / "000001_transcript_20250101.md").write_text("test1")
+    (save_dir / "000002_transcript_20250102.md").write_text("test2")
 
     class FakeOutputConfig:
         def __init__(self, save_path: str):
@@ -2356,7 +2356,7 @@ def test_list_recordings_handles_non_matching_files(monkeypatch, tmp_path):
     save_dir.mkdir()
 
     # Create transcript file
-    (save_dir / "transcript_20250101_000001.md").write_text("test")
+    (save_dir / "000001_transcript_20250101.md").write_text("test")
     # Create non-matching file
     (save_dir / "other_file.txt").write_text("not a transcript")
 
@@ -2391,7 +2391,7 @@ def test_recording_cleanup_order_audio_closed_before_display_join(
     """
     events: List[object] = []
 
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
 
     from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
@@ -2565,7 +2565,7 @@ def test_recording_enter_key_sets_event_and_stops_recording(monkeypatch, tmp_pat
     WHEN Enter key is pressed (input() returns)
     THEN enter_pressed event is set and recording stops.
     """
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
 
     from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
@@ -2694,7 +2694,7 @@ def test_recording_display_thread_exits_when_enter_pressed(monkeypatch, tmp_path
     WHEN enter_pressed event is set
     THEN display thread exits cleanly from the Live context loop.
     """
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
 
     from rejoice.core.config import AudioConfig, OutputConfig, TranscriptionConfig
@@ -2842,7 +2842,7 @@ def test_audio_file_deletion_prompt_user_keeps_file(monkeypatch, tmp_path, capsy
     """GIVEN a successful recording and transcription
     WHEN user chooses not to delete the audio file
     THEN the temporary audio file is preserved."""
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -2975,7 +2975,7 @@ def test_completion_output_shows_correct_format(monkeypatch, tmp_path, capsys):
     """GIVEN a successful recording and transcription
     WHEN transcription completes
     THEN the completion panel shows correct format with session details."""
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")
@@ -3138,7 +3138,7 @@ def test_transcription_progress_display_format(monkeypatch, tmp_path):
     THEN the progress display shows correct format with STATUS, SESSION ID,
     FILE, PROGRESS, ELAPSED.
     """
-    transcript_path = tmp_path / "transcript_20250101_000001.md"
+    transcript_path = tmp_path / "000001_transcript_20250101.md"
     transcript_path.write_text("---\nid: '000001'\n---\n\n", encoding="utf-8")
     temp_audio_path = tmp_path / "temp_audio.wav"
     temp_audio_path.write_bytes(b"dummy audio data")

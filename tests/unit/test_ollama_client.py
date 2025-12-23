@@ -1,4 +1,5 @@
 """Tests for Ollama client integration."""
+
 from unittest.mock import Mock, patch
 
 import pytest

@@ -15,6 +15,33 @@ def read_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def test_filename_pattern_matches_new_pattern():
+    """GIVEN the transcript filename regex
+    WHEN matching a new-format filename
+    THEN it matches and returns ID then date groups."""
+    filename = "000123_transcript_20250120.md"
+
+    match = manager.TRANSCRIPT_FILENAME_PATTERN.match(filename)
+
+    assert match is not None
+    id_str, date_str = match.groups()
+    assert id_str == "000123"
+    assert date_str == "20250120"
+
+
+def test_create_transcript_uses_new_pattern():
+    """GIVEN a new transcript creation
+    WHEN create_transcript is called
+    THEN the filename uses the ID-first pattern."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_dir = Path(tmpdir)
+
+        filepath, tid = manager.create_transcript(save_dir)
+
+        assert tid == "000001"
+        assert re.match(r"^000001_transcript_\d{8}\.md$", filepath.name)
+
+
 def test_create_transcript_creates_file_and_directory():
     """GIVEN an empty directory
     WHEN create_transcript is called
@@ -32,8 +59,8 @@ def test_create_transcript_creates_file_and_directory():
         # ID should be 6-digit zero-padded
         assert tid == "000001"
 
-        # Filename should match transcript_YYYYMMDD_ID.md
-        pattern = r"^transcript_\d{8}_000001\.md$"
+        # Filename should match 000001_transcript_YYYYMMDD.md
+        pattern = r"^000001_transcript_\d{8}\.md$"
         assert re.match(pattern, filepath.name)
 
         content = read_file(filepath)
@@ -52,8 +79,8 @@ def test_get_next_id_increments_over_existing_files():
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # Simulate existing transcripts across different dates
-        (save_dir / "transcript_20240101_000001.md").write_text("test")
-        (save_dir / "transcript_20240102_000002.md").write_text("test")
+        (save_dir / "000001_transcript_20240101.md").write_text("test")
+        (save_dir / "000002_transcript_20240102.md").write_text("test")
 
         next_id = manager.get_next_id(save_dir)
 
@@ -88,14 +115,14 @@ def test_create_transcript_avoids_duplicate_ids():
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # Pre-create the file that would correspond to ID 000001
-        existing = save_dir / "transcript_20240101_000001.md"
+        existing = save_dir / "000001_transcript_20240101.md"
         existing.write_text("existing")
 
         filepath, tid = manager.create_transcript(save_dir)
 
         assert filepath.exists()
         assert tid == "000002"
-        assert filepath.name.endswith("_000002.md")
+        assert re.match(r"^000002_transcript_\d{8}\.md$", filepath.name)
 
 
 def test_frontmatter_contains_expected_fields():
@@ -406,7 +433,7 @@ def test_get_next_id_skips_non_files():
         subdir = save_dir / "subdir"
         subdir.mkdir()
         # Create a transcript file
-        (save_dir / "transcript_20250101_000001.md").write_text("test")
+        (save_dir / "000001_transcript_20250101.md").write_text("test")
 
         next_id = manager.get_next_id(save_dir)
         assert next_id == "000002"
@@ -418,10 +445,10 @@ def test_get_next_id_handles_invalid_id_strings():
     THEN ValueError is caught and entry is skipped (lines 98-99)"""
     with tempfile.TemporaryDirectory() as tmpdir:
         save_dir = Path(tmpdir)
-        # Create file with invalid ID
-        (save_dir / "transcript_20250101_invalid.md").write_text("test")
+        # Create file with invalid ID (should be ignored)
+        (save_dir / "invalid_transcript_20250101.md").write_text("test")
         # Create valid file
-        (save_dir / "transcript_20250101_000005.md").write_text("test")
+        (save_dir / "000005_transcript_20250101.md").write_text("test")
 
         next_id = manager.get_next_id(save_dir)
         assert next_id == "000006"
@@ -452,7 +479,7 @@ def test_create_transcript_handles_collision_retry(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:
         save_dir = Path(tmpdir)
         # Create a file that would cause collision (using the same date as mocked)
-        (save_dir / "transcript_20250101_000001.md").write_text("existing")
+        (save_dir / "000001_transcript_20250101.md").write_text("existing")
 
         # Mock get_next_id to return same ID first time, then next
         call_count = [0]

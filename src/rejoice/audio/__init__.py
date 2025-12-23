@@ -1,4 +1,5 @@
 """Audio recording and device detection functionality."""
+
 from __future__ import annotations
 
 import logging

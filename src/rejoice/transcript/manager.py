@@ -20,7 +20,7 @@ from rejoice.exceptions import TranscriptError
 
 ID_WIDTH = 6
 TRANSCRIPT_FILENAME_PATTERN = re.compile(
-    r"^transcript_(\d{8})_(\d{%d})\.md$" % ID_WIDTH
+    r"^(\d{%d})_transcript_(\d{8})\.md$" % ID_WIDTH
 )
 
 
@@ -92,7 +92,7 @@ def get_next_id(save_dir: Path) -> str:
         if not match:
             continue
 
-        _date_str, id_str = match.groups()
+        id_str, _date_str = match.groups()
         try:
             numeric_id = int(id_str)
         except ValueError:
@@ -168,7 +168,7 @@ def create_transcript(save_dir: Path) -> Tuple[Path, str]:
     while attempts < max_attempts:
         transcript_id = get_next_id(save_dir)
         date_str = datetime.now().strftime("%Y%m%d")
-        filename = f"transcript_{date_str}_{transcript_id}.md"
+        filename = f"{transcript_id}_transcript_{date_str}.md"
         filepath = save_dir / filename
 
         if not filepath.exists():

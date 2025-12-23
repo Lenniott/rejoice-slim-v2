@@ -1,4 +1,5 @@
 """Custom exceptions for Rejoice."""
+
 from typing import Optional
 
 

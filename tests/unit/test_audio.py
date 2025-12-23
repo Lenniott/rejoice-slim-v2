@@ -1,4 +1,5 @@
 """Tests for audio device detection and configuration commands."""
+
 from unittest.mock import patch
 
 from click.testing import CliRunner

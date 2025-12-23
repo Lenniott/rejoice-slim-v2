@@ -104,6 +104,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Output displays ID, date and filename in a Rich table, sorted newest-first, with a simple limit parameter and a friendly message when no recordings exist.
   - Added two unit tests covering empty and populated transcript directories, with the full test suite passing at 93% coverage.
 
+- [R-011] Transcript Filename Order Normalisation
+  - Switched transcript filenames to `ID_transcript_YYYYMMDD.md` for ID-first sorting.
+  - Updated manager pattern, creation, and ID discovery; CLI listing/view now parse new group order.
+  - Refreshed unit tests for manager and CLI helpers to cover the new pattern (modules ~96% coverage).
+  - Overall project coverage currently ~77%; increasing legacy module tests needed to reach 90%.
+
 ## [2.0.0] - 2025-12-17
 
 ### Added - Phase 0: Development Environment Setup

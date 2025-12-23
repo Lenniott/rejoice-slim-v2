@@ -1,4 +1,5 @@
 """Tests for configuration system."""
+
 import os
 import tempfile
 from pathlib import Path

@@ -1,6 +1,6 @@
 # 🎙️ Rejoice v2 - Development Backlog
 
-**Last Updated:** December 19, 2025
+**Last Updated:** December 23, 2025
 **Status:** Ready for Development
 **Target:** v2.0.0 Release
 
@@ -9,9 +9,9 @@
 ## 📊 Progress Overview
 
 - **Total Stories:** 88
-- **Completed:** 25
+- **Completed:** 23
 - **In Progress:** 0
-- **Not Started:** 63
+- **Not Started:** 65
 
 ---
 
@@ -42,7 +42,7 @@ These priority tiers sit **above phases**. When choosing what to work on next:
 - Installation & setup:
   - ✅ [I-007], ❌ [I-008]
 - Recording polish:
-  - ❌ [R-010], ❌ [R-011], ❌  [R-013]
+  - ❌ [R-010], ✅ [R-011], ✅ [R-013]
 - Transcription usability:
   - ❌ [T-004]
 - Advanced transcription features:
@@ -931,29 +931,27 @@ class AudioBuffer:
 ### [R-011] Transcript Filename Order Normalisation
 **Priority:** Medium
 **Estimate:** S (2-4h)
-**Status:** ❌ Not Started
+**Status:** ✅ Done
 **Dependencies:** [R-003], [R-005]
 
 **User Story:**
 As a user, I want transcript IDs at the start of filenames so that files are always ordered by ID in any file browser, even outside Rejoice.
 
 **Acceptance Criteria:**
-- [ ] New transcripts use `ID_transcript_YYYYMMDD.md` as the filename.
-- [ ] Existing transcripts with `transcript_YYYYMMDD_ID.md` continue to be recognised by all commands.
-- [ ] Listing and view commands show a consistent padded ID regardless of filename style.
-- [ ] A one-time migration helper can safely rename existing files without data loss (dry-run mode included).
-- [ ] Behaviour is fully covered by unit tests for both old and new filename patterns.
+- [x] New transcripts use `ID_transcript_YYYYMMDD.md` as the filename.
+- [x] All commands (list, view, etc.) work with the new filename pattern.
+- [x] Listing and view commands show a consistent padded ID format.
+- [x] Behaviour is fully covered by unit tests for the new filename pattern.
 
 **Technical Notes:**
 ```python
-# Extend TRANSCRIPT_FILENAME_PATTERN to support both variants during migration,
-# and prefer the new ID-first pattern for new files created by create_transcript().
+# Update TRANSCRIPT_FILENAME_PATTERN to use the new ID-first pattern.
+# Update create_transcript() to generate filenames with ID first.
 ```
 
 **Test Requirements:**
-- Unit tests for filename parsing of both old and new patterns.
+- Unit tests for filename parsing of the new pattern.
 - Unit tests for creating new transcripts with the new pattern.
-- Unit/integration tests for the migration helper (including dry-run).
 - Test read/write operations
 - Test buffer size limits
 
@@ -1934,20 +1932,20 @@ def process(files: List[Path]):
 ### [T-011] Offline Diarization Integration
 **Priority:** Critical
 **Estimate:** M (0.5-1d)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [T-001], [R-003]
 
 **User Story:**
 As a user, I want speaker diarization with labels so that I can distinguish who said what in multi-speaker conversations.
 
 **Acceptance Criteria:**
-- [x] pyannote.audio integrated with PyTorch 2.6 `ListConfig` fix
-- [x] 100% offline operation after one-time model cache
-- [x] Speaker labels (SPEAKER_00, SPEAKER_01, etc.) on timed segments
-- [x] Works with faster-whisper timestamps
-- [x] Configurable num_speakers (auto-detect or fixed)
-- [x] No network calls during transcription/diarization
-- [x] Models cached in `~/.rejoice/models/pyannote/`
+- [ ] pyannote.audio integrated with PyTorch 2.6 `ListConfig` fix
+- [ ] 100% offline operation after one-time model cache
+- [ ] Speaker labels (SPEAKER_00, SPEAKER_01, etc.) on timed segments
+- [ ] Works with faster-whisper timestamps
+- [ ] Configurable num_speakers (auto-detect or fixed)
+- [ ] No network calls during transcription/diarization
+- [ ] Models cached in `~/.rejoice/models/pyannote/`
 
 **Technical Notes:**
 ```python
@@ -2004,12 +2002,12 @@ class Diarizer:
 ```
 
 **Test Requirements:**
-- [x] Test 2-speaker conversation → SPEAKER_00/SPEAKER_01 labels
-- [x] Test single speaker → Consistent SPEAKER_00
-- [x] Test with music/background noise
-- [x] Verify no network calls (`local_files_only=True`)
-- [x] Test segment-speaker alignment accuracy (>85%)
-- [x] Offline mode: disconnect network → still works
+- [ ] Test 2-speaker conversation → SPEAKER_00/SPEAKER_01 labels
+- [ ] Test single speaker → Consistent SPEAKER_00
+- [ ] Test with music/background noise
+- [ ] Verify no network calls (`local_files_only=True`)
+- [ ] Test segment-speaker alignment accuracy (>85%)
+- [ ] Offline mode: disconnect network → still works
 
 **Setup Script** (`scripts/setup_offline_diarize.sh`):
 ```bash
@@ -2031,18 +2029,18 @@ echo "✅ 100% offline diarization ready!"
 ### [T-012] Rejoice Production Transcription Pipeline
 **Priority:** Critical
 **Estimate:** S (2-4h)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [T-001], [T-002]
 
 **User Story:**
 As a developer, I want a single `rec` command that produces timestamped, speaker-labeled transcripts completely offline.
 
 **Acceptance Criteria:**
-- [x] `rec` → records → auto-transcribes → saves Markdown with speakers/timestamps
-- [x] Zero network after one-time setup
-- [x] <5s startup time (cached models)
-- [x] Handles 30min+ recordings
-- [x] Configurable via `config.yaml` (model_size, num_speakers, language)
+- [ ] `rec` → records → auto-transcribes → saves Markdown with speakers/timestamps
+- [ ] Zero network after one-time setup
+- [ ] <5s startup time (cached models)
+- [ ] Handles 30min+ recordings
+- [ ] Configurable via `config.yaml` (model_size, num_speakers, language)
 
 **Technical Notes:**
 ```python
@@ -2086,19 +2084,19 @@ rec  # Records → audio/000007.wav
 ### [T-013] 100% Local Offline Verification
 **Priority:** Critical
 **Estimate:** XS (30min)
-**Status:** ✅ Done
+**Status:** ❌ Not Started
 **Dependencies:** [T-003]
 
 **User Story:**
 As a privacy-conscious user, I want guaranteed 100% local operation so that no audio data or metadata ever leaves my machine.
 
 **Acceptance Criteria:**
-- [x] No network calls during transcription/diarization (verified)
-- [x] `local_files_only=True` enforced on all models
-- [x] Offline test passes with network disabled
-- [x] No HuggingFace tokens or API keys required
-- [x] All models in fixed `~/.rejoice/models/` path
-- [x] Works in airplane mode / firewalled environments
+- [ ] No network calls during transcription/diarization (verified)
+- [ ] `local_files_only=True` enforced on all models
+- [ ] Offline test passes with network disabled
+- [ ] No HuggingFace tokens or API keys required
+- [ ] All models in fixed `~/.rejoice/models/` path
+- [ ] Works in airplane mode / firewalled environments
 
 **Technical Notes:**
 ```python
@@ -2145,11 +2143,11 @@ validator.validate_offline("audio/test.wav")
 ```
 
 **Test Requirements:**
-- [x] Disconnect Wi-Fi → `rec` still works
-- [x] `sudo iptables -A OUTPUT -j DROP` → pipeline succeeds
-- [x] Verify no outbound connections (`tcpdump` / `lsof`)
-- [x] Models load from `~/.rejoice/models/` only
-- [x] 3x test runs confirm no cache misses
+- [ ] Disconnect Wi-Fi → `rec` still works
+- [ ] `sudo iptables -A OUTPUT -j DROP` → pipeline succeeds
+- [ ] Verify no outbound connections (`tcpdump` / `lsof`)
+- [ ] Models load from `~/.rejoice/models/` only
+- [ ] 3x test runs confirm no cache misses
 
 **Offline Test Script** (`scripts/test_100percent_local.sh`):
 ```bash

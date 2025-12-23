@@ -1,4 +1,5 @@
 """Tests for CLI framework setup."""
+
 from click.testing import CliRunner
 
 from rejoice.cli.commands import main

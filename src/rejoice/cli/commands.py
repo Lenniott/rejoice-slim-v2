@@ -504,7 +504,7 @@ def _iter_transcripts(save_dir: Path) -> list[Path]:
     def sort_key(path: Path) -> tuple[str, str]:
         match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
         assert match is not None  # Covered by construction above
-        date_str, id_str = match.groups()
+        id_str, date_str = match.groups()
         return (date_str, id_str)
 
     files.sort(key=sort_key, reverse=True)
@@ -540,7 +540,7 @@ def _get_transcript_path_by_id(save_dir: Path, user_supplied_id: str) -> Path | 
         match = TRANSCRIPT_FILENAME_PATTERN.match(entry.name)
         if not match:
             continue
-        _date_str, id_str = match.groups()
+        id_str, _date_str = match.groups()
         if id_str == normalised_id:
             return entry
 
@@ -640,7 +640,7 @@ def list_recordings(limit: int = 50):
         match = TRANSCRIPT_FILENAME_PATTERN.match(path.name)
         if not match:
             continue
-        date_str, id_str = match.groups()
+        id_str, date_str = match.groups()
         formatted_date = f"{date_str[0:4]}-{date_str[4:6]}-{date_str[6:8]}"
         table.add_row(id_str, formatted_date, path.name)
 

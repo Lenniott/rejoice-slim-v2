@@ -1,4 +1,5 @@
 """Ollama REST API client for AI enhancement."""
+
 import json
 from typing import Iterator, List
 

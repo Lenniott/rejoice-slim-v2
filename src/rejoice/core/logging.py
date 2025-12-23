@@ -1,4 +1,5 @@
 """Logging system for Rejoice."""
+
 import logging
 import logging.handlers
 from pathlib import Path

@@ -1,4 +1,5 @@
 """Tests for custom exceptions."""
+
 from rejoice.exceptions import (
     RejoiceError,
     AudioError,
