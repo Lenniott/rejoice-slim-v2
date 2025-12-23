@@ -1111,7 +1111,146 @@ def record_and_transcribe():
 
 ---
 
-### [R-013] Audio File Archiving for Lossless Information
+### [R-013] Enhanced Transcription Progress Display & Completion Output
+**Priority:** High
+**Estimate:** M (4-8h)
+**Status:** ✅ Done
+**Dependencies:** [R-012, T-009]
+
+**User Story:**
+As a user, I want a professional transcription progress display and clear completion summary so that I can see exactly what's happening during transcription and have a clear record of the completed session.
+
+**Acceptance Criteria:**
+- [x] Transcription progress shown in structured panel format with STATUS, SESSION ID, FILE, PROGRESS, ELAPSED, OUTPUT
+- [x] Progress bar shows percentage (0-100%) with visual bar
+- [x] Elapsed time displayed in MM:SS.mm format
+- [x] Completion panel shows COMPLETE status with session details
+- [x] Completion panel includes: SESSION ID, FILE, DURATION, WORDS count, OUTPUT location
+- [x] Audio file deletion prompt (default: yes) instead of auto-deletion
+- [x] Clean screen transitions between recording, transcription, and completion states
+
+**Example Console Output - Transcription Progress:**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Rejoice                                                                       │
+│                                                                              │
+│ STATUS        TRANSCRIBING                                                    │
+│ SESSION ID    000054                                                         │
+│ FILE          transcript_20251220_000054.md                                  │
+│                                                                              │
+│ PROGRESS      ███████████████████████████████░░░░░░░░░░░░░░░░░░░░░░ 68%         │
+│ ELAPSED       00:03.2                                                        │
+│                                                                              │
+│ OUTPUT                                                                      │
+│ Processing audio…                                                            │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Example Console Output - Completion:**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Rejoice                                                                       │
+│                                                                              │
+│ ✅ COMPLETE                                                                  │
+│ SESSION ID    000054                                                         │
+│ FILE          transcript_20251220_000054.md                                  │
+│ DURATION      00:05                                                          │
+│ WORDS         127                                                            │
+│                                                                              │
+│ OUTPUT                                                                      │
+│ Saved to /Users/benjamin/Documents/transcripts                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Technical Notes:**
+```python
+from rich.panel import Panel
+from rich.prompt import Confirm
+import threading
+import time
+
+# Transcription progress display
+def _display_transcription_progress():
+    """Display live transcription progress."""
+    transcription_active = threading.Event()
+    transcription_active.set()
+
+    with Live(console=console, auto_refresh=True, screen=True) as live:
+        while transcription_active.is_set():
+            elapsed = time.time() - transcription_start_time
+            minutes, seconds = divmod(int(elapsed), 60)
+            milliseconds = int((elapsed % 1) * 100)
+            elapsed_formatted = f"{minutes:02d}:{seconds:02d}.{milliseconds:02d}"
+
+            # Calculate progress percentage
+            if audio_duration:
+                estimated_total = audio_duration * 2  # ~2x realtime
+                progress_pct = min(100, int((elapsed / estimated_total) * 100))
+            else:
+                progress_pct = 0
+
+            # Create progress bar (50 chars)
+            filled = int(progress_pct / 2)
+            progress_bar = "█" * filled + "░" * (50 - filled)
+
+            panel_content = (
+                f"STATUS        TRANSCRIBING\n"
+                f"SESSION ID    {transcript_id}\n"
+                f"FILE          {filepath.name}\n"
+                f"\n"
+                f"PROGRESS      {progress_bar} {progress_pct}%\n"
+                f"ELAPSED       {elapsed_formatted}\n"
+                f"\n"
+                f"OUTPUT\n"
+                f"Processing audio…"
+            )
+
+            panel = Panel(panel_content, title="Rejoice", border_style="yellow")
+            live.update(panel)
+            time.sleep(0.1)
+
+# Completion output
+sys.stdout.write("\033[2J\033[H")  # Clear screen
+final_panel = Panel(
+    f"✅ COMPLETE\n"
+    f"SESSION ID    {transcript_id}\n"
+    f"FILE          {filepath.name}\n"
+    f"DURATION      {duration_formatted}\n"
+    f"WORDS         {word_count}\n\n"
+    f"OUTPUT\n"
+    f"Saved to {filepath.parent}",
+    title="Rejoice",
+    border_style="green",
+)
+console.print(final_panel)
+
+# Audio file deletion prompt
+if temp_audio_path.exists():
+    should_delete = Confirm.ask(
+        f"Delete temporary audio file?",
+        default=True
+    )
+    if should_delete:
+        temp_audio_path.unlink(missing_ok=True)
+```
+
+**Test Requirements:**
+- Test transcription progress display updates correctly
+- Test progress bar fills appropriately
+- Test elapsed time increments properly
+- Test completion panel shows correct information
+- Test word count is accurate
+- Test audio file deletion prompt appears
+- Test default "yes" works for audio deletion
+- Test screen clearing between states
+- Test with various recording durations
+- Integration test: full recording → transcription → completion flow
+
+---
+
+### [R-014] Audio File Archiving for Lossless Information
 **Priority:** High
 **Estimate:** M (4-8h)
 **Status:** ❌ Not Started

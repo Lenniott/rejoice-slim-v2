@@ -262,10 +262,10 @@ def test_first_run_setup_full_flow():
 
         with patch("rejoice.setup.get_config_dir", return_value=config_dir):
             with patch("rejoice.setup.console"):
-                # Mock Confirm.ask to return True for mic test prompt
+                # Mock Confirm.ask to return True for prompts
                 with patch(
                     "rejoice.setup.Confirm.ask", return_value=True
-                ):  # Mock all Confirm.ask calls (mic test + download continue)
+                ):  # Mock all Confirm.ask calls (download continue, etc.)
                     with patch(
                         "rejoice.setup.select_whisper_model", return_value="small"
                     ):
@@ -277,45 +277,33 @@ def test_first_run_setup_full_flow():
                                 return_value="default",
                             ):
                                 with patch(
-                                    "rejoice.setup.test_microphone", return_value=True
+                                    "rejoice.setup.setup_save_location",
+                                    return_value=str(Path(tmpdir) / "transcripts"),
                                 ):
                                     with patch(
-                                        "rejoice.setup.setup_save_location",
-                                        return_value=str(Path(tmpdir) / "transcripts"),
+                                        "rejoice.setup.test_ollama_connection",
+                                        return_value=True,
                                     ):
                                         with patch(
-                                            "rejoice.setup.test_ollama_connection",
-                                            return_value=True,
+                                            "rejoice.setup.create_sample_transcript"
                                         ):
-                                            with patch(
-                                                "rejoice.setup.create_sample_transcript"
-                                            ):
-                                                run_first_setup()
+                                            run_first_setup()
 
-                                                # Verify device was saved to config
-                                                config_file = config_dir / "config.yaml"
-                                                assert config_file.exists()
-                                                config_data = yaml.safe_load(
-                                                    config_file.read_text()
-                                                )
-                                                assert "audio" in config_data
-                                                assert (
-                                                    config_data["audio"]["device"]
-                                                    == "default"
-                                                )
-
-                                        # Config file should be created
-                                        config_file = config_dir / "config.yaml"
-                                        assert config_file.exists()
-
-                                        # Should contain user selections
-                                        config_data = yaml.safe_load(
-                                            config_file.read_text()
-                                        )
-                                        assert (
-                                            config_data["transcription"]["model"]
-                                            == "small"
-                                        )
+                                            # Verify device was saved to config
+                                            config_file = config_dir / "config.yaml"
+                                            assert config_file.exists()
+                                            config_data = yaml.safe_load(
+                                                config_file.read_text()
+                                            )
+                                            assert "audio" in config_data
+                                            assert (
+                                                config_data["audio"]["device"]
+                                                == "default"
+                                            )
+                                            assert (
+                                                config_data["transcription"]["model"]
+                                                == "small"
+                                            )
 
 
 def test_first_run_setup_cancelled():
@@ -330,28 +318,27 @@ def test_first_run_setup_cancelled():
 
         with patch("rejoice.setup.get_config_dir", return_value=config_dir):
             with patch("rejoice.setup.console"):
-                # Simulate user cancelling at mic test prompt
+                # Simulate user cancelling at microphone setup prompt
                 with patch("rejoice.setup.Confirm.ask", return_value=False):
-                    # User skips mic test, but setup continues
+                    # User skips microphone setup, but setup continues
                     # So we need to cancel at a later step -
                     # let's cancel at model download failure
-                    with patch("rejoice.setup.test_microphone", return_value=True):
+                    with patch(
+                        "rejoice.setup.setup_save_location",
+                        return_value=str(Path(tmpdir) / "transcripts"),
+                    ):
                         with patch(
-                            "rejoice.setup.setup_save_location",
-                            return_value=str(Path(tmpdir) / "transcripts"),
+                            "rejoice.setup.select_whisper_model",
+                            return_value="small",
                         ):
                             with patch(
-                                "rejoice.setup.select_whisper_model",
-                                return_value="small",
+                                "rejoice.setup.download_whisper_model",
+                                return_value=False,
                             ):
-                                with patch(
-                                    "rejoice.setup.download_whisper_model",
-                                    return_value=False,
-                                ):
-                                    # User cancels when asked to continue
-                                    # after download failure
-                                    with pytest.raises(SystemExit):
-                                        run_first_setup()
+                                # User cancels when asked to continue
+                                # after download failure
+                                with pytest.raises(SystemExit):
+                                    run_first_setup()
 
                                     # Config file should not exist
                                     config_file = config_dir / "config.yaml"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
 import threading
 import time
@@ -15,7 +16,6 @@ from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, TimeElapsedColumn
 from rich.prompt import Confirm
 from rich.table import Table
 
@@ -67,7 +67,7 @@ def _calculate_audio_level(audio_chunk: np.ndarray) -> float:
     # Normalize to 0-1 range (assuming input is typically -1.0 to 1.0)
     # Clamp to prevent values > 1.0 from causing display issues
     # Scale: 0.5 RMS = full bar (so rms/0.5 gives 0-2 range, min caps at 1.0)
-    return min(1.0, rms / 0.5)
+    return min(1.0, rms / 0.25)
 
 
 def start_recording_session(
@@ -107,9 +107,6 @@ def start_recording_session(
     # 1. Create transcript file immediately (zero data loss principle)
     save_dir = Path(config.output.save_path).expanduser()
     filepath, transcript_id = create_transcript(save_dir)
-
-    console.print(f"🎙️  Recording started [dim](ID {transcript_id})[/dim]")
-    console.print(f"📄  Transcript: {filepath}")
 
     # 2. Create temporary audio file for recording
     temp_audio_file = tempfile.NamedTemporaryFile(
@@ -191,8 +188,9 @@ def start_recording_session(
     def _display_recording_status():
         """Display live recording status with elapsed time and audio level."""
         try:
+            sys.stdout.write("\033[2J\033[H")
             with Live(
-                console=console, auto_refresh=True, screen=True, transient=False
+                console=console, auto_refresh=True, screen=False, transient=False
             ) as live:
                 while recording_active.is_set() and not enter_pressed.is_set():
                     elapsed = time.time() - start_time
@@ -218,7 +216,7 @@ def start_recording_session(
                         border_style="red",
                     )
                     live.update(panel)
-                    time.sleep(0.1)  # Update 10 times per second for smooth display
+                    time.sleep(0.05)  # Update 10 times per second for smooth display
         finally:
             # Restore console handler after Live display exits
             if console_handler:
@@ -276,7 +274,7 @@ def start_recording_session(
 
         # If display thread is still alive, it's a daemon so it will be killed
         # Don't block forever waiting for it
-
+        sys.stdout.write("\033[2J\033[H")
         console.print("\n⏹️  Stopping recording...")
 
     if cancelled:
@@ -308,8 +306,22 @@ def start_recording_session(
         except Exception:  # pragma: no cover - defensive cleanup
             pass
     else:
-        # 5. Run single transcription pass with progress bar
-        console.print("\n🔄 Transcribing...")
+        # 5. Run single transcription pass with progress display
+        sys.stdout.write("\033[2J\033[H")
+
+        # Get audio duration for progress calculation
+        import wave as wave_module
+
+        try:
+            with wave_module.open(str(temp_audio_path), "rb") as wf:
+                audio_duration = wf.getnframes() / wf.getframerate()
+        except Exception:
+            audio_duration = None
+
+        transcription_start_time = time.time()
+        segments = []
+        segment_count = 0
+
         try:
             # Suppress verbose INFO logs from faster-whisper, huggingface, httpx
             # These libraries log model downloads/checks which are noisy
@@ -343,18 +355,75 @@ def start_recording_session(
 
             try:
                 transcriber = Transcriber(config.transcription)
-                segments = []
 
-                with Progress(
-                    BarColumn(),
-                    TimeElapsedColumn(),
-                    console=console,
-                ) as progress:
-                    progress.add_task("Transcribing", total=None)
-                    for segment in transcriber.transcribe_file(str(temp_audio_path)):
-                        text = str(segment.get("text", "")).strip()
-                        if text:
-                            segments.append(text)
+                # Flag to control display thread
+                transcription_active = threading.Event()
+                transcription_active.set()
+
+                # Transcription progress display with Live panel
+                def _display_transcription_progress():
+                    """Display live transcription progress."""
+                    with Live(console=console, auto_refresh=True, screen=False) as live:
+                        while transcription_active.is_set():
+                            elapsed = time.time() - transcription_start_time
+                            minutes, seconds = divmod(int(elapsed), 60)
+                            tenths = int((elapsed % 1) * 10)
+                            elapsed_formatted = f"{minutes:02d}:{seconds:02d}.{tenths}"
+
+                            # Calculate progress percentage
+                            # (estimate based on elapsed time)
+                            if audio_duration:
+                                # Estimate: assume transcription takes ~0.5x realtime
+                                # (twice as fast as audio duration)
+                                # This factor should be tuned based on your hardware
+                                # and model size (e.g., 0.1 on GPU, 0.5 on fast CPU)
+                                estimated_total_duration = audio_duration * 0.1
+                                progress_pct = min(
+                                    100, int((elapsed / estimated_total_duration) * 100)
+                                )
+                            else:
+                                progress_pct = 0
+
+                            # Create progress bar (50 chars)
+                            filled = int(progress_pct / 2)
+                            progress_bar = "█" * filled + "░" * (50 - filled)
+
+                            panel_content = (
+                                f"STATUS        TRANSCRIBING\n"
+                                f"SESSION ID    {transcript_id}\n"
+                                f"FILE          {filepath.name}\n"
+                                f"\n"
+                                f"PROGRESS      {progress_bar} {progress_pct}%\n"
+                                f"ELAPSED       {elapsed_formatted}\n"
+                                f"\n"
+                                f"OUTPUT\n"
+                                f"Processing audio…"
+                            )
+
+                            panel = Panel(
+                                panel_content,
+                                title="Rejoice",
+                                border_style="yellow",
+                            )
+                            live.update(panel)
+                            time.sleep(0.01)
+
+                # Start display thread
+                display_thread = threading.Thread(
+                    target=_display_transcription_progress, daemon=True
+                )
+                display_thread.start()
+
+                # Transcribe
+                for segment in transcriber.transcribe_file(str(temp_audio_path)):
+                    text = str(segment.get("text", "")).strip()
+                    if text:
+                        segments.append(text)
+                        segment_count += 1
+
+                # Stop display thread
+                transcription_active.clear()
+                display_thread.join(timeout=0.5)
 
                 # Write final transcript atomically
                 if segments:
@@ -375,16 +444,46 @@ def start_recording_session(
 
         except Exception as e:  # pragma: no cover - defensive error handling
             console.print(f"[yellow]Warning: Transcription failed: {e}[/yellow]")
-        finally:
-            # Always clean up temp audio file
-            try:
-                temp_audio_path.unlink(missing_ok=True)
-            except Exception:  # pragma: no cover - defensive cleanup
-                pass
 
         # 6. Finalise the transcript frontmatter to reflect a completed recording.
         update_status(filepath, "completed")
-        console.print(f"✅ Transcript saved: {filepath}")
+
+        # Calculate duration and word count for final output
+        duration_seconds = time.time() - start_time
+        minutes, seconds = divmod(int(duration_seconds), 60)
+        duration_formatted = f"{minutes:02d}:{seconds:02d}"
+
+        # Count words in transcript
+        if segments:
+            final_text = " ".join(segments)
+            word_count = len(final_text.split())
+        else:
+            word_count = 0
+
+        # Prompt to delete audio file (default yes)
+        should_delete = True
+        if temp_audio_path.exists():
+            should_delete = Confirm.ask("Delete temporary audio file?", default=True)
+            if should_delete:
+                try:
+                    temp_audio_path.unlink(missing_ok=True)
+                except Exception:  # pragma: no cover - defensive cleanup
+                    pass
+
+        # Final completion output
+        sys.stdout.write("\033[2J\033[H")
+        final_panel = Panel(
+            f"✅ COMPLETE\n"
+            f"SESSION ID    {transcript_id}\n"
+            f"FILE          {filepath.name}\n"
+            f"DURATION      {duration_formatted}\n"
+            f"WORDS         {word_count}\n\n"
+            f"OUTPUT\n"
+            f"Saved to {filepath.parent}",
+            title="Rejoice",
+            border_style="green",
+        )
+        console.print(final_panel)
 
     return filepath, transcript_id
 

@@ -2,7 +2,7 @@
 
 This module provides guided setup for new users, including:
 - Model selection and downloading
-- Microphone testing
+- Microphone selection
 - Save location configuration
 - Ollama connection testing
 - Sample transcript creation
@@ -310,7 +310,7 @@ def test_microphone(device: str | int | None = None, duration: float = 3.0) -> b
                         )
                         live.update(panel)
                         live.refresh()
-                        time.sleep(0.1)  # Update 10 times per second
+                        time.sleep(0.005)
             except Exception:
                 pass  # Ignore errors in display thread
 
@@ -458,7 +458,7 @@ def run_first_setup() -> None:
 
     This function guides the user through:
     1. Welcome message
-    2. Microphone test
+    2. Microphone selection
     3. Save location selection
     4. Model selection and download
     5. Ollama test (optional)
@@ -483,22 +483,11 @@ def run_first_setup() -> None:
     config = get_default_config()
     selected_device: str | int = "default"  # Default if user skips
 
-    # Step 1: Choose and test microphone
+    # Step 1: Choose microphone
     console.print("\n[bold]1️⃣  Setting up microphone...[/bold]")
     if Confirm.ask("Configure microphone now?", default=True):
         # Choose microphone
         selected_device = choose_microphone()
-
-        # Test microphone
-        if Confirm.ask("Test this microphone?", default=True):
-            mic_ok = test_microphone(device=selected_device)
-            if not mic_ok:
-                console.print(
-                    "[yellow]⚠ Microphone test had issues, "
-                    "but you can continue.[/yellow]\n"
-                )
-        else:
-            console.print("[dim]Skipping microphone test.[/dim]\n")
 
         # Save device to config (will be saved at end)
         config["audio"]["device"] = (
