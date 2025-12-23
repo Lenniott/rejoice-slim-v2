@@ -170,23 +170,29 @@ def start_recording_session(
     input_thread = threading.Thread(target=_wait_for_enter_input, daemon=True)
     input_thread.start()
 
+    # Decide whether to enable Live display (avoid in non-TTY to prevent hangs)
+    enable_live_display = sys.stdout.isatty()
+
     # Suppress console logging handler before starting display thread
     # This prevents debug logs from interfering with Rich Live's alternate screen
     import logging
 
     root_logger = logging.getLogger()
     console_handler = None
-    for handler in root_logger.handlers:
-        # Find the RichHandler (console handler)
-        if hasattr(handler, "rich_tracebacks"):
-            console_handler = handler
-            # Temporarily remove the handler to prevent debug logs from interfering
-            root_logger.removeHandler(handler)
-            break
+    if enable_live_display:
+        for handler in root_logger.handlers:
+            # Find the RichHandler (console handler)
+            if hasattr(handler, "rich_tracebacks"):
+                console_handler = handler
+                # Temporarily remove the handler to prevent debug logs from interfering
+                root_logger.removeHandler(handler)
+                break
 
     # Display thread for Rich Live panel
     def _display_recording_status():
         """Display live recording status with elapsed time and audio level."""
+        if not enable_live_display:
+            return
         try:
             sys.stdout.write("\033[2J\033[H")
             with Live(
@@ -222,15 +228,17 @@ def start_recording_session(
             if console_handler:
                 root_logger.addHandler(console_handler)
 
-    display_thread = threading.Thread(target=_display_recording_status, daemon=True)
-    display_thread.start()
+    display_thread = None
+    if enable_live_display:
+        display_thread = threading.Thread(target=_display_recording_status, daemon=True)
+        display_thread.start()
 
     try:
         # 3. Wait for stop signal (Enter key detected in input thread)
         try:
             # Wait for enter_pressed event (set by input thread)
             while not enter_pressed.is_set() and recording_active.is_set():
-                time.sleep(0.1)
+                time.sleep(0.05)
         except KeyboardInterrupt:
             # Handle Ctrl+C as a cancel signal for [R-008].
             cancelled = True
@@ -250,9 +258,6 @@ def start_recording_session(
         enter_pressed.set()  # Signal display thread to stop
 
         # Restore console handler if it was suppressed
-        if console_handler:
-            root_logger.addHandler(console_handler)
-
         # CRITICAL: Close audio stream and WAV file FIRST
         # This ensures the file is properly flushed and closed before transcription
         try:
@@ -270,7 +275,8 @@ def start_recording_session(
 
         # Wait for display thread to finish (with timeout)
         # Only call join once - removed duplicate
-        display_thread.join(timeout=0.5)
+        if display_thread:
+            display_thread.join(timeout=0.5)
 
         # If display thread is still alive, it's a daemon so it will be killed
         # Don't block forever waiting for it
