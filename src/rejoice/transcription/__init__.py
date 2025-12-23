@@ -40,7 +40,7 @@ class Transcriber:
     ----------
     config:
         The :class:`~rejoice.core.config.TranscriptionConfig` that controls the
-        model size, default language and VAD behaviour.
+        model size, default language, VAD method, and VAD filtering behaviour.
     device:
         Device string passed through to WhisperX (for example, ``"cpu"``
         or ``"cuda"``). Defaults to ``"cpu"``.
@@ -77,13 +77,16 @@ class Transcriber:
 
         try:
             # Enforce local-only operation to comply with "all local, no cloud" vision.
-            # Models must be downloaded once (during setup) and then work offline.
-            # WhisperX uses faster-whisper under the hood, so model caching
-            # works the same.
+            # WhisperX automatically downloads models on first use and caches them
+            # locally. After the first download, models work offline (no cloud access
+            # needed). WhisperX uses faster-whisper under the hood, so model caching
+            # works the same. Use Silero VAD to avoid PyTorch 2.6+ serialization
+            # issues with Pyannote VAD.
             self._model = whisperx.load_model(
                 config.model,
                 device=device,
                 compute_type=compute_type,
+                vad_method=config.vad_method,
             )
         except Exception as exc:  # pragma: no cover - exercised via error tests
             message = f"Failed to load transcription model '{config.model}': {exc}"
@@ -148,13 +151,14 @@ class Transcriber:
             # WhisperX requires loading audio first
             audio = whisperx.load_audio(audio_path)
 
-            # Transcribe using WhisperX API
+            # Transcribe using WhisperX API with Silero VAD
             # For now, use simple transcription (no alignment/diarization)
             # This will be extended in [A-001], [A-003] for advanced features
+            # Note: When using Silero VAD, the vad_filter parameter is not accepted
+            # by transcribe() since VAD is handled during model loading.
             result = self._model.transcribe(
                 audio,
                 language=language_arg,
-                vad_filter=self._config.vad_filter,
             )
         except Exception as exc:
             message = f"Transcription failed for '{audio_path}': {exc}"

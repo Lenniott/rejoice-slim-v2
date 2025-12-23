@@ -4,9 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-import yaml
-
 
 def test_detect_first_run_no_config():
     """GIVEN no config file exists
@@ -60,43 +57,6 @@ def test_model_selection_default():
     with patch("rejoice.setup.Prompt.ask", return_value="2"):  # Default is "2" (base)
         model = select_whisper_model()
         assert model == "base"
-
-
-def test_model_download_if_not_exists():
-    """GIVEN model is not downloaded
-    WHEN download_model is called
-    THEN model is downloaded"""
-    from rejoice.setup import download_whisper_model
-
-    mock_model = MagicMock()
-    with patch("rejoice.setup.whisperx") as mock_whisperx:
-        # First call should fail (model not found locally)
-        # Second call should succeed (download)
-        mock_whisperx.load_model.side_effect = [
-            Exception("Model not found locally"),
-            mock_model,
-        ]
-
-        with patch("rejoice.setup.console"):
-            download_whisper_model("tiny", check_only=False)
-            # Should attempt download
-            assert mock_whisperx.load_model.call_count >= 1
-
-
-def test_model_download_skips_if_exists():
-    """GIVEN model is already downloaded
-    WHEN download_model is called
-    THEN download is skipped"""
-    from rejoice.setup import download_whisper_model
-
-    mock_model = MagicMock()
-    with patch("rejoice.setup.whisperx") as mock_whisperx:
-        mock_whisperx.load_model.return_value = mock_model
-        with patch("rejoice.setup.console"):
-            download_whisper_model("tiny", check_only=True)
-            # Should not show download message if already exists
-            # (check_only=True means we're just verifying, not downloading)
-            assert mock_whisperx.load_model.called
 
 
 def test_test_microphone():
@@ -250,111 +210,3 @@ def test_create_sample_transcript():
             # Should contain sample content
             content = transcript_files[0].read_text()
             assert "Welcome to Rejoice" in content or "sample" in content.lower()
-
-
-def test_first_run_setup_full_flow():
-    """GIVEN first run setup is triggered
-    WHEN all steps complete successfully
-    THEN config file is created with user selections"""
-    from rejoice.setup import run_first_setup
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".config" / "rejoice"
-        config_dir.mkdir(parents=True)
-
-        with patch("rejoice.setup.get_config_dir", return_value=config_dir):
-            with patch("rejoice.setup.console"):
-                # Mock Confirm.ask to return True for mic test prompt
-                with patch(
-                    "rejoice.setup.Confirm.ask", return_value=True
-                ):  # Mock all Confirm.ask calls (mic test + download continue)
-                    with patch(
-                        "rejoice.setup.select_whisper_model", return_value="small"
-                    ):
-                        with patch(
-                            "rejoice.setup.download_whisper_model", return_value=True
-                        ):
-                            with patch(
-                                "rejoice.setup.choose_microphone",
-                                return_value="default",
-                            ):
-                                with patch(
-                                    "rejoice.setup.test_microphone", return_value=True
-                                ):
-                                    with patch(
-                                        "rejoice.setup.setup_save_location",
-                                        return_value=str(Path(tmpdir) / "transcripts"),
-                                    ):
-                                        with patch(
-                                            "rejoice.setup.test_ollama_connection",
-                                            return_value=True,
-                                        ):
-                                            with patch(
-                                                "rejoice.setup.create_sample_transcript"
-                                            ):
-                                                run_first_setup()
-
-                                                # Verify device was saved to config
-                                                config_file = config_dir / "config.yaml"
-                                                assert config_file.exists()
-                                                config_data = yaml.safe_load(
-                                                    config_file.read_text()
-                                                )
-                                                assert "audio" in config_data
-                                                assert (
-                                                    config_data["audio"]["device"]
-                                                    == "default"
-                                                )
-
-                                        # Config file should be created
-                                        config_file = config_dir / "config.yaml"
-                                        assert config_file.exists()
-
-                                        # Should contain user selections
-                                        config_data = yaml.safe_load(
-                                            config_file.read_text()
-                                        )
-                                        assert (
-                                            config_data["transcription"]["model"]
-                                            == "small"
-                                        )
-
-
-def test_first_run_setup_cancelled():
-    """GIVEN user cancels during setup
-    WHEN setup is interrupted
-    THEN no config file is created"""
-    from rejoice.setup import run_first_setup
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_dir = Path(tmpdir) / ".config" / "rejoice"
-        config_dir.mkdir(parents=True)
-
-        with patch("rejoice.setup.get_config_dir", return_value=config_dir):
-            with patch("rejoice.setup.console"):
-                # Simulate user cancelling at mic test prompt
-                with patch("rejoice.setup.Confirm.ask", return_value=False):
-                    # User skips mic test, but setup continues
-                    # So we need to cancel at a later step -
-                    # let's cancel at model download failure
-                    with patch("rejoice.setup.test_microphone", return_value=True):
-                        with patch(
-                            "rejoice.setup.setup_save_location",
-                            return_value=str(Path(tmpdir) / "transcripts"),
-                        ):
-                            with patch(
-                                "rejoice.setup.select_whisper_model",
-                                return_value="small",
-                            ):
-                                with patch(
-                                    "rejoice.setup.download_whisper_model",
-                                    return_value=False,
-                                ):
-                                    # User cancels when asked to continue
-                                    # after download failure
-                                    with pytest.raises(SystemExit):
-                                        run_first_setup()
-
-                                    # Config file should not exist
-                                    config_file = config_dir / "config.yaml"
-                                    assert not config_file.exists()

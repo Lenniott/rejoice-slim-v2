@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
+import sys
 import tempfile
 import threading
 import time
@@ -50,8 +53,7 @@ def _default_wait_for_stop() -> None:
     Note: This function is not used when Live display is active.
     Input is handled in a separate thread in start_recording_session().
     """
-    # Simple input() - when Live uses alternate screen (screen=True),
-    # input() works correctly because it reads from the original terminal
+    # Simple input() - reads from terminal
     try:
         input()
     except (EOFError, KeyboardInterrupt):
@@ -62,15 +64,17 @@ def _calculate_audio_level(audio_chunk: np.ndarray) -> float:
     """Calculate RMS audio level for visual meter.
 
     Returns a normalized value between 0.0 and 1.0 representing audio level.
+    Uses a more sensitive scaling to show movement even with quiet speech.
     """
     if len(audio_chunk) == 0:
         return 0.0
     # Calculate RMS (Root Mean Square) for audio level
     rms = float(np.sqrt(np.mean(audio_chunk**2)))
     # Normalize to 0-1 range (assuming input is typically -1.0 to 1.0)
+    # Use a smaller divisor (0.1 instead of 0.5) to make the meter 5x more sensitive
+    # This means normal speech will show movement without needing to shout
     # Clamp to prevent values > 1.0 from causing display issues
-    # Scale: 0.5 RMS = full bar (so rms/0.5 gives 0-2 range, min caps at 1.0)
-    return min(1.0, rms / 0.5)
+    return min(1.0, rms / 0.05)
 
 
 def start_recording_session(
@@ -101,6 +105,11 @@ def start_recording_session(
     Returns:
         tuple[Path, str]: The transcript filepath and ID.
     """
+    # Suppress warnings for the entire recording session to keep output clean
+    import warnings
+
+    warnings.filterwarnings("ignore")
+
     config = load_config()
 
     # Override language if provided via CLI flag
@@ -111,9 +120,7 @@ def start_recording_session(
     save_dir = Path(config.output.save_path).expanduser()
     filepath, transcript_id = create_transcript(save_dir)
 
-    console.print(f"🎙️  Recording started [dim](ID {transcript_id})[/dim]")
-    console.print(f"📄  Transcript: {filepath}")
-
+    console.print("⏳ Loading Rejoice...")
     # 2. Create temporary audio file for recording
     temp_audio_file = tempfile.NamedTemporaryFile(
         suffix=".wav",
@@ -132,7 +139,6 @@ def start_recording_session(
     # Shared state for display thread
     recording_active = threading.Event()
     recording_active.set()
-    start_time = time.time()
     audio_level_state = {"value": 0.0}
     audio_level_lock = threading.Lock()
 
@@ -147,6 +153,7 @@ def start_recording_session(
         with audio_level_lock:
             audio_level_state["value"] = level
 
+    # 3. Start recording - stream must be active before showing "Recording started"
     stream = record_audio(
         _audio_callback,
         device=config.audio.device if config.audio.device != "default" else None,
@@ -154,18 +161,24 @@ def start_recording_session(
         channels=1,
     )
 
+    # 4. NOW show "Recording started" message - recording is actually happening
+    # console.print(f"🎙️  Recording started [dim](ID {transcript_id})[/dim]")
+    # console.print(f"📄  Transcript: {filepath}")
+    # No delay needed - inline updates don't require screen switching
+    # Messages appear above the Live frame
+
+    # 5. Initialize timer NOW - recording is actually happening
+    start_time = time.time()
+
     cancelled = False
 
-    # Display with Live - use screen=True for alternate screen
-    # (prevents duplicate panels)
-    # Input handling in separate thread that reads from original terminal
+    # Input handling in separate thread to avoid blocking display updates
+    # This prevents race conditions between display refresh and user input
     enter_pressed = threading.Event()
 
     def _wait_for_enter_input():
-        """Wait for Enter in separate thread - reads from original terminal."""
+        """Wait for Enter in separate thread."""
         try:
-            # When Live uses screen=True, it uses alternate screen buffer
-            # input() reads from the original terminal, so it works correctly
             input()
             enter_pressed.set()
         except (EOFError, KeyboardInterrupt):
@@ -176,56 +189,78 @@ def start_recording_session(
     input_thread = threading.Thread(target=_wait_for_enter_input, daemon=True)
     input_thread.start()
 
-    # Suppress console logging handler before starting display thread
-    # This prevents debug logs from interfering with Rich Live's alternate screen
+    # During Live rendering, console output is reserved exclusively for the frame.
+    # While Live is active, the frame owns stdout.
+    # Suppress console logging to prevent logs from corrupting frame borders,
+    # pushing content upward, or interleaving mid-refresh.
     import logging
 
     root_logger = logging.getLogger()
     console_handler = None
+    original_console_level = None
+
     for handler in root_logger.handlers:
-        # Find the RichHandler (console handler)
         if hasattr(handler, "rich_tracebacks"):
             console_handler = handler
-            # Temporarily remove the handler to prevent debug logs from interfering
-            root_logger.removeHandler(handler)
+            original_console_level = handler.level
+            # Raise handler level to ERROR to prevent any logs during Live rendering
+            # This enforces the rule: "While Live is active, the frame owns stdout"
+            handler.setLevel(logging.ERROR)
             break
 
     # Display thread for Rich Live panel
     def _display_recording_status():
         """Display live recording status with elapsed time and audio level."""
         try:
+            # During Live rendering, console output is reserved exclusively for the
+            # frame. While Live is active, the frame owns stdout.
+            # Logs are suppressed to avoid corrupting the display.
+            sys.stdout.write("\033[2J\033[H")
             with Live(
-                console=console, auto_refresh=True, screen=True, transient=False
+                console=console, auto_refresh=True, screen=False, transient=False
             ) as live:
+                # Throttle updates by state to avoid unnecessary redraws
+                # RECORDING: ~10-15 fps (66-100ms) for audio level meter
+                RECORDING_REFRESH_INTERVAL = 0.1  # 10 fps for recording
+                last_update_time = 0.0
+
                 while recording_active.is_set() and not enter_pressed.is_set():
-                    elapsed = time.time() - start_time
-                    minutes, seconds = divmod(int(elapsed), 60)
+                    current_time = time.time()
 
-                    with audio_level_lock:
-                        current_level = audio_level_state["value"]
+                    # Throttle updates for recording state
+                    if current_time - last_update_time >= RECORDING_REFRESH_INTERVAL:
+                        elapsed = current_time - start_time
+                        minutes, seconds = divmod(int(elapsed), 60)
 
-                    # Create audio level bars (0-20 bars)
-                    num_bars = int(current_level * 20)
-                    level_bars = "█" * num_bars + "░" * (20 - num_bars)
+                        with audio_level_lock:
+                            current_level = audio_level_state["value"]
 
-                    panel_content = (
-                        f"🔴 Recording...\n"
-                        f"⏱️  {minutes:02d}:{seconds:02d}\n"
-                        f"🎤 [{level_bars}]\n\n"
-                        f"Press Enter to stop recording."
-                    )
+                        # Create audio level bars (0-20 bars)
+                        num_bars = int(current_level * 20)
+                        level_bars = "█" * num_bars + "░" * (20 - num_bars)
 
-                    panel = Panel(
-                        panel_content,
-                        title="Rejoice",
-                        border_style="red",
-                    )
-                    live.update(panel)
-                    time.sleep(0.1)  # Update 10 times per second for smooth display
+                        panel_content = (
+                            f"🔴 Recording...\n"
+                            f"⏱️  {minutes:02d}:{seconds:02d}\n"
+                            f"🎤 [{level_bars}]\n\n"
+                            f"Press Enter to stop recording."
+                        )
+
+                        panel = Panel(
+                            panel_content,
+                            title="Rejoice",
+                            border_style="red",
+                        )
+                        live.update(panel)
+                        last_update_time = current_time
+
+                    # Check exit condition more frequently than refresh rate
+                    time.sleep(0.05)
         finally:
-            # Restore console handler after Live display exits
-            if console_handler:
-                root_logger.addHandler(console_handler)
+            # Live context exits automatically when the with block exits
+            # Restore console handler level so logs can appear again
+            if console_handler and original_console_level is not None:
+                console_handler.setLevel(original_console_level)
 
     display_thread = threading.Thread(target=_display_recording_status, daemon=True)
     display_thread.start()
@@ -254,10 +289,6 @@ def start_recording_session(
         recording_active.clear()
         enter_pressed.set()  # Signal display thread to stop
 
-        # Restore console handler if it was suppressed
-        if console_handler:
-            root_logger.addHandler(console_handler)
-
         # CRITICAL: Close audio stream and WAV file FIRST
         # This ensures the file is properly flushed and closed before transcription
         try:
@@ -274,12 +305,22 @@ def start_recording_session(
             pass
 
         # Wait for display thread to finish (with timeout)
-        # Only call join once - removed duplicate
-        display_thread.join(timeout=0.5)
+        # The display thread will restore the console handler in its finally block
+        display_thread.join(
+            timeout=1.0
+        )  # Increased timeout to allow Live context to exit
 
-        # If display thread is still alive, it's a daemon so it will be killed
-        # Don't block forever waiting for it
+        # Brief pause to ensure Live context has fully exited
+        # Inline updates don't require screen restoration, but we want clean state
+        if not display_thread.is_alive():
+            try:
+                time.sleep(0.1)  # Brief pause to ensure clean state
+            except KeyboardInterrupt:
+                # Ignore KeyboardInterrupt during cleanup to ensure cancelled status
+                # is properly set
+                pass
 
+        sys.stdout.write("\033[2J\033[H")
         console.print("\n⏹️  Stopping recording...")
 
     if cancelled:
@@ -332,14 +373,14 @@ def start_recording_session(
             )
 
         # 6. Run single transcription pass with progress bar
-        console.print("\n🔄 Transcribing...")
+        sys.stdout.write("\033[2J\033[H")
+        console.print("🔄 Transcribing...")
         transcription_successful = False
         try:
-            # Suppress verbose INFO logs from WhisperX (which uses faster-whisper),
-            # huggingface, httpx. These libraries log model downloads/checks which
-            # are noisy. Note: Models are cached locally - HTTP request is just a
-            # version check, not a download
+            # Suppress all verbose output from WhisperX and its dependencies
             import logging
+
+            # Warnings are already suppressed at the start of the function
 
             # Get root logger and its console handler
             root_logger = logging.getLogger()
@@ -350,25 +391,34 @@ def start_recording_session(
                 if hasattr(handler, "rich_tracebacks"):
                     console_handler = handler
                     original_console_level = handler.level
-                    # Temporarily suppress INFO logs on console
-                    handler.setLevel(logging.WARNING)
+                    # Temporarily suppress all logs below ERROR on console
+                    handler.setLevel(logging.ERROR)
                     break
 
-            # Also suppress at logger level for noisy libraries
-            # WhisperX uses faster-whisper under the hood, so we still need to
-            # suppress faster_whisper logs
+            # Suppress at logger level for all noisy libraries
             noisy_loggers = [
                 "faster_whisper",
                 "whisperx",
+                "whisperx.asr",
+                "whisperx.vads",
+                "whisperx.vads.silero",
                 "huggingface_hub",
                 "httpx",
                 "httpcore",
+                "urllib3",
+                "torchaudio",
+                "speechbrain",
+                "pyannote",
             ]
             for logger_name in noisy_loggers:
                 logger = logging.getLogger(logger_name)
-                logger.setLevel(logging.WARNING)
+                logger.setLevel(logging.ERROR)
 
-            try:
+            # Capture stdout/stderr during transcription to suppress WhisperX
+            # progress bars, print statements, and warnings
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+                io.StringIO()
+            ):
                 transcriber = Transcriber(config.transcription)
                 segments = []
 
@@ -400,14 +450,15 @@ def start_recording_session(
                     update_language(filepath, transcriber.last_language)
 
                 transcription_successful = True
-            finally:
-                # Restore console handler level
-                if console_handler and original_console_level is not None:
-                    console_handler.setLevel(original_console_level)
-                # Restore loggers to use parent logger's level
-                # (NOTSET = inherit from root)
-                for logger_name in noisy_loggers:
-                    logging.getLogger(logger_name).setLevel(logging.NOTSET)
+
+            # Restore console handler level
+            if console_handler and original_console_level is not None:
+                console_handler.setLevel(original_console_level)
+            # Restore loggers to use parent logger's level
+            # (NOTSET = inherit from root)
+            for logger_name in noisy_loggers:
+                logging.getLogger(logger_name).setLevel(logging.NOTSET)
+            # Warnings remain suppressed for the entire session to keep output clean
 
         except Exception as e:  # pragma: no cover - defensive error handling
             console.print(f"[yellow]Warning: Transcription failed: {e}[/yellow]")
@@ -426,7 +477,59 @@ def start_recording_session(
 
         # 7. Finalise the transcript frontmatter to reflect a completed recording.
         update_status(filepath, "completed")
-        console.print(f"✅ Transcript saved: {filepath}")
+
+        # After transcription completes, render final COMPLETE state
+        # This ensures the last state is clean and prevents half-frames if the thread
+        # exits early. Makes COMPLETE state deterministic.
+        if transcription_successful:
+            # Calculate duration from audio file (not session time)
+            # Use archived audio file if available, otherwise fall back to temp file
+            audio_file_for_duration = (
+                archived_audio_path if archived_audio_path else temp_audio_path
+            )
+            try:
+                with wave.open(str(audio_file_for_duration), "rb") as wav_reader:
+                    frames = wav_reader.getnframes()
+                    sample_rate = wav_reader.getframerate()
+                    recording_duration = frames / sample_rate
+            except Exception:
+                # Fallback to session time if we can't read the audio file
+                recording_duration = time.time() - start_time
+
+            duration_minutes = int(recording_duration // 60)
+            duration_seconds = int(recording_duration % 60)
+            duration_formatted = f"{duration_minutes:02d}:{duration_seconds:02d}"
+
+            # Count words in transcript
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    # Extract body (after frontmatter)
+                    if "---\n" in content:
+                        parts = content.split("---\n", 2)
+                        body = parts[2] if len(parts) > 2 else content
+                    else:
+                        body = content
+                    word_count = len(body.split())
+            except Exception:
+                word_count = 0
+
+            sys.stdout.write("\033[2J\033[H")
+            # Render COMPLETE state
+            final_panel = Panel(
+                f"✅ COMPLETE\n"
+                f"SESSION ID    {transcript_id}\n"
+                f"FILE          {filepath.name}\n"
+                f"DURATION      {duration_formatted}\n"
+                f"WORDS         {word_count}\n\n"
+                f"OUTPUT\n"
+                f"Saved to {filepath.parent}",
+                title="Rejoice",
+                border_style="green",
+            )
+            console.print(final_panel)
+        else:
+            console.print(f"✅ Transcript saved: {filepath}")
 
         # 8. Handle audio file deletion prompt (R-013)
         # Only prompt if transcription succeeded and audio file was archived
@@ -444,14 +547,14 @@ def start_recording_session(
             else:
                 # Prompt user for deletion (default: n = keep)
                 should_delete = Confirm.ask(
-                    f"Delete audio file to save space?\n  {relative_audio_path}",
+                    "Delete audio file to save space?",
                     default=False,
                 )
 
                 if should_delete:
                     try:
                         archived_audio_path.unlink(missing_ok=True)
-                        console.print(f"🗑️  Audio file deleted: {relative_audio_path}")
+                        console.print("🗑️  Audio file deleted")
                     except (
                         Exception
                     ) as e:  # pragma: no cover - defensive error handling

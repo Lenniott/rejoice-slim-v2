@@ -11,6 +11,7 @@ This module provides guided setup for new users, including:
 from __future__ import annotations
 
 import logging
+import signal
 import sys
 import time
 from pathlib import Path
@@ -97,21 +98,16 @@ def select_whisper_model() -> str:
     return selected_model
 
 
-def download_whisper_model(model: str, check_only: bool = False) -> bool:
-    """Download Whisper model if not already available locally.
+def verify_whisperx_installation() -> bool:
+    """Verify WhisperX is installed and available.
 
-    Parameters
-    ----------
-    model:
-        Model name to download (tiny, base, small, medium, large).
-    check_only:
-        If True, only check if model exists without downloading.
+    Note: WhisperX automatically downloads models on first use when
+    whisperx.load_model() is called. We don't need to pre-download them here.
 
     Returns
     -------
     bool
-        True if model is available (or was successfully downloaded),
-        False if download failed.
+        True if WhisperX is available, False otherwise.
     """
     if whisperx is None:
         console.print(
@@ -120,35 +116,11 @@ def download_whisper_model(model: str, check_only: bool = False) -> bool:
         )
         return False
 
-    # First, check if model exists locally
-    try:
-        # Try to load with WhisperX to check if it exists
-        # WhisperX uses faster-whisper under the hood, which handles local caching
-        whisperx.load_model(model, device="cpu", compute_type="int8")
-        if check_only:
-            return True
-        console.print(f"[green]✓ Model '{model}' is already downloaded[/green]")
-        return True
-    except Exception:
-        # Model doesn't exist locally
-        if check_only:
-            return False
-
-    # Download the model
-    console.print(f"[yellow]Downloading model '{model}'...[/yellow]")
+    console.print("[green]✓ WhisperX is installed[/green]")
     console.print(
-        "This may take a few minutes depending on your internet connection.\n"
+        "[dim]Note: Models will download automatically on first transcription.[/dim]\n"
     )
-
-    try:
-        # Download with WhisperX (it will download if not cached)
-        whisperx.load_model(model, device="cpu", compute_type="int8")
-        console.print(f"[green]✓ Model '{model}' downloaded successfully[/green]\n")
-        return True
-    except Exception as exc:
-        console.print(f"[red]✗ Failed to download model '{model}': {exc}[/red]\n")
-        logger.error(f"Model download failed: {exc}", exc_info=True)
-        return False
+    return True
 
 
 def choose_microphone() -> str | int:
@@ -244,9 +216,19 @@ def test_microphone(device: str | int | None = None, duration: float = 3.0) -> b
 
         audio_data = []
         recording_done = False
+        cancel_event = threading.Event()  # Use Event for thread-safe cancellation
         audio_level = 0.0
         audio_level_lock = threading.Lock()
         stream = None
+
+        # Set up signal handler for Ctrl+C to ensure it works even with Rich
+        # Live context
+        def signal_handler(signum, frame):
+            nonlocal recording_done
+            recording_done = True
+            cancel_event.set()  # Also set the event for thread-safe cancellation
+
+        original_handler = signal.signal(signal.SIGINT, signal_handler)
 
         def audio_callback(indata, frames, timing, status):
             if not recording_done:
@@ -279,7 +261,7 @@ def test_microphone(device: str | int | None = None, duration: float = 3.0) -> b
         def _display_audio_level():
             try:
                 with Live(console=console, auto_refresh=False, screen=False) as live:
-                    while not recording_done:
+                    while not recording_done and not cancel_event.is_set():
                         elapsed = time.time() - start_time
                         remaining = max(0.0, duration - elapsed)
 
@@ -319,14 +301,42 @@ def test_microphone(device: str | int | None = None, duration: float = 3.0) -> b
         display_thread.start()
 
         # Record for specified duration (can be interrupted with Ctrl+C)
+        # Use interruptible sleep loop instead of single time.sleep() to ensure
+        # Ctrl+C is properly handled even when Rich Live context is active
         try:
-            time.sleep(duration)
+            # Sleep in small increments to allow Ctrl+C to interrupt
+            # Use cancel_event.wait() which is interruptible and thread-safe
+            elapsed = 0.0
+            while (
+                elapsed < duration and not recording_done and not cancel_event.is_set()
+            ):
+                sleep_interval = min(
+                    0.1, duration - elapsed
+                )  # Sleep in 0.1s increments
+                if sleep_interval > 0:
+                    # Use cancel_event.wait() which can be interrupted by the
+                    # event being set
+                    if cancel_event.wait(timeout=sleep_interval):
+                        # Event was set (cancelled)
+                        break
+                elapsed = time.time() - start_time
+                # Check recording_done and cancel_event again after sleep
+                if recording_done or cancel_event.is_set():
+                    break
+
+            # Check if cancellation occurred (via signal handler)
+            if recording_done or cancel_event.is_set():
+                console.print("\n[yellow]⚠ Test cancelled by user[/yellow]")
+                return True  # Don't fail setup if user cancels
         except KeyboardInterrupt:
             console.print("\n[yellow]⚠ Test cancelled by user[/yellow]")
             return True  # Don't fail setup if user cancels
         finally:
+            # Restore original signal handler
+            signal.signal(signal.SIGINT, original_handler)
             # Always stop recording and close stream, even if interrupted
             recording_done = True
+            cancel_event.set()  # Ensure event is set to stop display thread
             if stream is not None:
                 try:
                     stream.stop()
@@ -459,12 +469,13 @@ def run_first_setup() -> None:
 
     This function guides the user through:
     1. Welcome message
-    2. Microphone test
+    2. Microphone setup
     3. Save location selection
-    4. Model selection and download
-    5. Ollama test (optional)
-    6. Sample transcript creation
-    7. Config file creation
+    4. Model selection
+    5. WhisperX verification
+    6. Ollama test (optional)
+    7. Sample transcript creation
+    8. Config file creation
     """
     console.print(
         Panel.fit(
@@ -484,28 +495,22 @@ def run_first_setup() -> None:
     config = get_default_config()
     selected_device: str | int = "default"  # Default if user skips
 
-    # Step 1: Choose and test microphone
+    # Step 1: Choose microphone
     console.print("\n[bold]1️⃣  Setting up microphone...[/bold]")
     if Confirm.ask("Configure microphone now?", default=True):
         # Choose microphone
         selected_device = choose_microphone()
-
-        # Test microphone
-        if Confirm.ask("Test this microphone?", default=True):
-            mic_ok = test_microphone(device=selected_device)
-            if not mic_ok:
-                console.print(
-                    "[yellow]⚠ Microphone test had issues, "
-                    "but you can continue.[/yellow]\n"
-                )
-        else:
-            console.print("[dim]Skipping microphone test.[/dim]\n")
 
         # Save device to config (will be saved at end)
         config["audio"]["device"] = (
             str(selected_device)
             if isinstance(selected_device, int)
             else selected_device
+        )
+
+        console.print(
+            "[dim]You can test your microphone later using: "
+            "[cyan]rec config mic[/cyan][/dim]\n"
         )
     else:
         console.print(
@@ -520,33 +525,33 @@ def run_first_setup() -> None:
     console.print("\n[bold]3️⃣  Selecting transcription model...[/bold]")
     model = select_whisper_model()
 
-    # Step 4: Download model
-    console.print("\n[bold]4️⃣  Downloading model...[/bold]")
-    download_success = download_whisper_model(model, check_only=False)
-    if not download_success:
+    # Step 4: Verify WhisperX installation
+    console.print("\n[bold]4️⃣  Verifying WhisperX installation...[/bold]")
+    if not verify_whisperx_installation():
         console.print(
-            "[red]✗ Model download failed. Please check your internet connection "
-            "and try again.[/red]\n"
+            "[red]✗ WhisperX is not installed. Please install it and try again.[/red]\n"
         )
-        if not Confirm.ask("Continue anyway? (model will need to be downloaded later)"):
+        if not Confirm.ask(
+            "Continue anyway? (transcription won't work until WhisperX is installed)"
+        ):
             console.print("[yellow]Setup cancelled.[/yellow]")
             sys.exit(1)
 
-    # Step 5: Test Ollama (optional)
-    console.print("\n[bold]5️⃣  Testing AI features (optional)...[/bold]")
+    # Step 6: Test Ollama (optional)
+    console.print("\n[bold]6️⃣  Testing AI features (optional)...[/bold]")
     ollama_ok = test_ollama_connection()
     if not ollama_ok:
         console.print(
             "[dim]You can set up Ollama later if you want AI features.[/dim]\n"
         )
 
-    # Step 6: Create sample transcript
-    console.print("\n[bold]6️⃣  Creating sample transcript...[/bold]")
+    # Step 7: Create sample transcript
+    console.print("\n[bold]7️⃣  Creating sample transcript...[/bold]")
     save_dir = Path(save_path)
     create_sample_transcript(save_dir)
 
-    # Step 7: Save configuration
-    console.print("\n[bold]7️⃣  Saving configuration...[/bold]")
+    # Step 8: Save configuration
+    console.print("\n[bold]8️⃣  Saving configuration...[/bold]")
     # Config was initialized at the start, now update with user selections
     config["transcription"]["model"] = model
     config["output"]["save_path"] = save_path

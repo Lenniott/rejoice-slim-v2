@@ -17,6 +17,7 @@ class TranscriptionConfig:
     model: str = "medium"
     language: str = "auto"
     vad_filter: bool = True
+    vad_method: str = "silero"
 
 
 @dataclass

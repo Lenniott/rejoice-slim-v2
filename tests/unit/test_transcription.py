@@ -33,10 +33,16 @@ def test_transcriber_initialises_model_with_config(monkeypatch):
     created: Dict[str, object] = {}
     mock_whisperx = create_mock_whisperx_module(monkeypatch)
 
-    def mock_load_model(model: str, device: str = "cpu", compute_type: str = "int8"):
+    def mock_load_model(
+        model: str,
+        device: str = "cpu",
+        compute_type: str = "int8",
+        vad_method: str = "silero",
+    ):
         created["model"] = model
         created["device"] = device
         created["compute_type"] = compute_type
+        created["vad_method"] = vad_method
 
         class DummyModel:
             def transcribe(self, *args, **kwargs):  # pragma: no cover - not used here
@@ -55,6 +61,7 @@ def test_transcriber_initialises_model_with_config(monkeypatch):
     assert created["model"] == "small"
     assert created["device"] == "cpu"
     assert created["compute_type"] == "int8"
+    assert created["vad_method"] == "silero"
 
 
 def test_transcribe_file_yields_normalised_segments_and_uses_vad_and_language(
@@ -423,7 +430,12 @@ def test_whisperx_model_caching(monkeypatch):
 
     call_count = 0
 
-    def mock_load_model(model: str, device: str = "cpu", compute_type: str = "int8"):
+    def mock_load_model(
+        model: str,
+        device: str = "cpu",
+        compute_type: str = "int8",
+        vad_method: str = "silero",
+    ):
         nonlocal call_count
         call_count += 1
 
