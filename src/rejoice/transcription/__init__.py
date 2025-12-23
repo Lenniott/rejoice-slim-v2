@@ -14,6 +14,7 @@ while enabling future features like speaker diarization and word-level timestamp
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, Optional, cast
 
@@ -82,12 +83,34 @@ class Transcriber:
             # needed). WhisperX uses faster-whisper under the hood, so model caching
             # works the same. Use Silero VAD to avoid PyTorch 2.6+ serialization
             # issues with Pyannote VAD.
-            self._model = whisperx.load_model(
-                config.model,
-                device=device,
-                compute_type=compute_type,
-                vad_method=config.vad_method,
-            )
+            #
+            # Force offline mode to prevent HuggingFace components from trying to
+            # check for updates or access the internet when offline. This ensures
+            # the tool works completely offline after initial model download.
+            # Multiple environment variables are needed to cover all HuggingFace
+            # components (Hub, Transformers, Datasets) that might try to connect.
+            original_env = {
+                "HF_HUB_OFFLINE": os.environ.get("HF_HUB_OFFLINE"),
+                "TRANSFORMERS_OFFLINE": os.environ.get("TRANSFORMERS_OFFLINE"),
+                "HF_DATASETS_OFFLINE": os.environ.get("HF_DATASETS_OFFLINE"),
+            }
+            try:
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                os.environ["HF_DATASETS_OFFLINE"] = "1"
+                self._model = whisperx.load_model(
+                    config.model,
+                    device=device,
+                    compute_type=compute_type,
+                    vad_method=config.vad_method,
+                )
+            finally:
+                # Restore original values
+                for key, value in original_env.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
         except Exception as exc:  # pragma: no cover - exercised via error tests
             message = f"Failed to load transcription model '{config.model}': {exc}"
             logger.error(message, exc_info=True)
